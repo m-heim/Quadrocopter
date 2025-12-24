@@ -5,7 +5,7 @@
 #define PIEZO 4
 #define LED 5
 #define INVOLTAGE A7
-#define SENDER 1
+#define SENDER 0
 
 #if SENDER == 1
 #define CE_PIN 7
@@ -39,6 +39,29 @@ MCApp app = MCApp();
 
 int8_t val = 0;
 
+ReceiverPayload payload;
+
+void setSpeeds(ReceiverPayload p) {
+  uint8_t speeds[4];
+  for (int i = 0; i < 4; i++)
+  {
+    speeds[i] = p.speed;
+  }
+  for (int i = 0; i < 4; i++)
+  {
+    int v = 1000;
+    v += 7 * speeds[i];
+    if (v > 2000) {
+      v = 2000;
+    }
+    if (v < 1000) {
+      v = 1000;
+    }
+    servos[i].writeMicroseconds(v);
+    Serial.println(v);
+  }
+}
+
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -56,6 +79,7 @@ void setup()
 
 #if SENDER == 0
   app.initPiezo(PIEZO);
+  app.setNoPiezo(true);
   app.initVoltage(INVOLTAGE, 3);
   app.initLed(LED);
   for (int i = 0; i < 4; i++)
@@ -158,7 +182,7 @@ void loop()
       app.log("Hello from sender");
       for (int i = 0; i < 4; i++)
       {
-        tone(PIEZO, (i + 1) * 400, 100);
+        app.buzz((i + 1) * 400, 100);
         delay(100);
       }
     }
@@ -168,28 +192,13 @@ void loop()
       app.log("Bye from sender");
       for (int i = 3; i >= 0; i--)
       {
-        tone(PIEZO, (i + 1) * 400, 100);
+        app.buzz((i + 1) * 400, 100);
         delay(100);
       }
     }
     else if (msgBuf[0] == CONTROL)
     {
-      ReceiverPayload payload;
       memcpy(&payload, msgBuf + 2, sizeof(payload));
-      uint8_t speeds[4];
-      for (int i = 0; i < 4; i++)
-      {
-        speeds[i] = payload.speed;
-      }
-      for (int i = 0; i < 4; i++)
-      {
-        int v = 1000;
-        v += 7 * speeds[i];
-        if (v > 2000) {
-          v = 2000;
-        }
-        servos[i].writeMicroseconds(v);
-      }
       if (Serial)
       {
         app.log("Payload from sender: ");
@@ -211,13 +220,13 @@ void loop()
     app.log("Radio not available");
     app.setLed(1);
   }
-  if (Serial)
+/**  if (Serial)
   {
     Serial.print("Voltage: ");
     Serial.print((int)app.getVoltage(), DEC);
     Serial.print("V");
     Serial.print("\n");
-  }
+  }**/
   if (!hasPackage)
   {
     app.buzz(freq, 10);
@@ -232,6 +241,7 @@ void loop()
   else
   {
   }
-  delay(40);
+  setSpeeds(payload);
+  delay(10);
 #endif
 }

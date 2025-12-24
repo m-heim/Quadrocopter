@@ -4,32 +4,6 @@
 #include "Arduino.h"
 #include "communication_provider.hpp"
 
-enum
-{
-    HELLO = 10,
-    BYE,
-    CONFIG,
-    CONFIG_ACK,
-    CONTROL,
-    STATUS_SENDER,
-    STATUS_RECEIVER,
-} MessageType;
-
-struct Message
-{
-    uint8_t msg;
-    uint8_t length;
-    uint8_t data[PAYLOAD_LENGTH - 2];
-};
-
-struct ReceiverPayload
-{
-    int8_t speed;
-    int8_t pitch;
-    int8_t roll;
-    int8_t yaw;
-};
-
 class MCApp
 {
 public:
@@ -62,6 +36,9 @@ public:
     }
     inline void buzz(int freq, int dur)
     {
+        if (noPiezo) {
+            return;
+        }
         if (piezoPin == -1)
         {
             ledError();
@@ -98,6 +75,11 @@ public:
         pinMode(pin, OUTPUT);
         this->ledPin = pin;
     }
+    inline void infinite() {
+        while (1) {
+
+        }
+    }
     inline void setLed(int val)
     {
         if (this->ledPin == -1)
@@ -108,6 +90,9 @@ public:
         {
             digitalWrite(ledPin, val);
         }
+    }
+    inline void setNoPiezo(bool v) {
+        noPiezo = v;
     }
     inline void ledToggle()
     {
@@ -122,5 +107,6 @@ private:
     int ledPin = -1;
     float voltageFactor = 1;
     bool ledState = false;
+    bool noPiezo = false;
 };
 #endif

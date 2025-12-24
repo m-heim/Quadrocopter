@@ -16,8 +16,11 @@ s = serial.Serial("COM3", 9600, timeout=10)
 
 def data_send(speed: float, steer: float) -> None:
     print("Sending data" +  str(speed) + str(steer))
+    print(int.to_bytes(int(speed * 127), length=1, signed=True))
+    print(int.to_bytes(int(steer * 127), length=1, signed=True))
     data = b'c' + int.to_bytes(int(speed * 127), length=1, signed=True) + b'\n' + b'r' + int.to_bytes(int(steer * 127), length=1, signed=True) + b'\n'
     s.write(data)
+    print("Data" + str(list(data)))
 
 def joystick_read_axis(joystick: pygame.joystick.Joystick, axis: int) -> float:
     return joystick.get_axis(axis)
@@ -52,7 +55,7 @@ def main():
             print(f'Speed: {speed}, Steer: {steer}')
         data_send(speed, steer)
         print("Got data: " + s.readline().decode('utf-8', errors='ignore'))
-        time.sleep(0.04)
+        time.sleep(0.4)
 
 if __name__ == '__main__':
     main()
