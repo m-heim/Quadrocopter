@@ -5,7 +5,8 @@
 #include "utils.hpp"
 #include <Adafruit_MPU6050.h>
 
-#define SENDER 1
+#define SENDER 0
+#define VEHICLE 0
 #define PIEZO 4
 #define LED 5
 #define INVOLTAGE A7
@@ -71,11 +72,17 @@ bool gyro = false;
 double frontWeight = 0;
 double leftWeight = 0;
 
+float setPoints[4];
+float value[4];
+float error[4];
+float error_sum[4];
+float deltaError[4];
+float previousError[4];
+float pid[4];
+
 uint64_t v = millis();
 
-#if SENDER == 0
-void setSpeeds(ReceiverPayload p) {
-  float speeds[4];
+void setValues() {
   float xAcc = am.acceleration.x;
   float yAcc = am.acceleration.y;
   float zAcc = am.acceleration.z;
@@ -85,25 +92,36 @@ void setSpeeds(ReceiverPayload p) {
   float alphaY = (alphaY1 * 0.45) + 1;
   float xGyro = g.gyro.x * 4.5 + 0.25;
   float yGyro = g.gyro.y * 4.5 + 0.07;
-  float leftWeightVal = xGyro * 0.5 + alphaX * 0.5;
-  float frontWeightVal = -(yGyro * 0.5 + alphaY * 0.5);
-  leftWeight = (EXPONENTIAL_FACTOR * leftWeightVal) + ((1 - EXPONENTIAL_FACTOR) * leftWeight);
-  frontWeight = (EXPONENTIAL_FACTOR * frontWeightVal) + ((1 - EXPONENTIAL_FACTOR) * frontWeight);
+  float leftWeightVal = xGyro * 0.3 + alphaX * 0.7;
+  float frontWeightVal = -(yGyro * 0.3 + alphaY * 0.7);
+  value[1] = frontWeightVal;
+  value[3] = leftWeightVal;
+  char buf[189];
+  sprintf(buf, "%d %d %d %d", (int) (alphaX * 1000), (int) (alphaY * 1000), (int) (xGyro * 1000), (int) (yGyro * 1000));
+  app.log(buf);
+}
+
+#if SENDER == 0
+void setSpeeds(ReceiverPayload p) {
+  float speeds[4];
+  setValues();
+  leftWeight = (EXPONENTIAL_FACTOR * value[3]) + ((1 - EXPONENTIAL_FACTOR) * leftWeight);
+  frontWeight = (EXPONENTIAL_FACTOR * value[1]) + ((1 - EXPONENTIAL_FACTOR) * frontWeight);
   /*if (abs(frontWeight) < 0.4) {
     frontWeight = 0;
   } else */
-  if (frontWeight < -4) {
-    frontWeight = -4;
-  } else if (frontWeight > 4) {
-    frontWeight = 4;
+  if (frontWeight < -8) {
+    frontWeight = -8;
+  } else if (frontWeight > 8) {
+    frontWeight = 8;
   }
   /*if (abs(leftWeight) < 0.4) {
     leftWeight = 0;
   } else */
-  if (leftWeight < -4) {
-    leftWeight = -4;
-  } else if (leftWeight > 4) {
-    leftWeight = 4;
+  if (leftWeight < -8) {
+    leftWeight = -8;
+  } else if (leftWeight > 8) {
+    leftWeight = 8;
   }
   for (int i = 0; i < 4; i++)
   {
@@ -150,7 +168,7 @@ void setSpeeds(ReceiverPayload p) {
     servos[i].writeMicroseconds(v);
   }
   char buf[189];
-  sprintf(buf, "%d %d %d %d %d %d %d %d %d %d", (int) (alphaX * 1000), (int) (alphaY * 1000), (int) (xGyro * 1000), (int) (yGyro * 1000), (int) frontWeight, (int) leftWeight, (int) speeds[0], (int) speeds[1], (int) speeds[2], (int) speeds[3]);
+  sprintf(buf, "%d %d %d %d %d %d", (int) (frontWeight * 1000), (int) (leftWeight * 1000), (int) speeds[0], (int) speeds[1], (int) speeds[2], (int) speeds[3]);
   app.log(buf);
 }
 
@@ -162,6 +180,74 @@ void noPackageAction() {
   {
     freq = FREQ_BASE;
   }
+}
+#endif
+
+#if VEHICLE == 1
+#define MOTOR_1_EN_L 2
+#define MOTOR_1_EN_R 4
+#define MOTOR_1_PWM_L 5
+#define MOTOR_1_PWM_R 6
+
+#define MOTOR_2_PWM_R 10
+#define MOTOR_2_PWM_L 9
+#define MOTOR_2_EN_L A1
+#define MOTOR_2_EN_R A2
+
+
+void motor_1_drive(int8_t speed) {
+  if (speed > 0) {
+    analogWrite(MOTOR_1_PWM_L, speed * 8);
+    analogWrite(MOTOR_1_PWM_R, 0);
+  } if (speed < 0) {
+    analogWrite(MOTOR_1_PWM_L, 0);
+    analogWrite(MOTOR_1_PWM_R, speed * 8);
+  } else {
+    analogWrite(MOTOR_1_PWM_L, 0);
+    analogWrite(MOTOR_1_PWM_R, 0);
+  }
+}
+
+void motor_2_drive(int8_t speed) {
+  if (speed > 0) {
+    analogWrite(MOTOR_2_PWM_L, speed * 8);
+    analogWrite(MOTOR_2_PWM_R, 0);
+  } if (speed < 0) {
+    analogWrite(MOTOR_2_PWM_L, 0);
+    analogWrite(MOTOR_2_PWM_R, speed * 8);
+  } else {
+    analogWrite(MOTOR_2_PWM_L, 0);
+    analogWrite(MOTOR_2_PWM_R, 0);
+  }
+}
+
+void motor_1_setup(int status) {
+  digitalWrite(MOTOR_1_EN_L, status);
+  digitalWrite(MOTOR_1_EN_R, status);
+}
+
+void motor_2_setup(int status) {
+  digitalWrite(MOTOR_2_EN_L, status);
+  digitalWrite(MOTOR_2_EN_R, status);
+}
+
+void drive(int8_t speed, int8_t steering) {
+  int16_t speed_left = speed + steering;
+  int16_t speed_right = speed - steering;
+  if (speed_left > 127) {
+    speed_left = 127;
+  } else if (speed_left < -127) {
+    speed_left = -127;
+  }
+
+  if (speed_right > 127) {
+    speed_right = 127;
+  } else if (speed_right < -127) {
+    speed_right = -127;
+  }
+
+  motor_1_drive(speed_left);
+  motor_2_drive(speed_right);
 }
 #endif
 
@@ -179,7 +265,10 @@ void setup()
   {
     app.log("Nrf radio successfully connected");
   }
-
+#if VEHICLE == 1
+  motor_1_setup(1);
+  motor_2_setup(1);
+#endif
 #if SENDER == 0
   app.initPiezo(PIEZO);
   app.setNoPiezo(true);
