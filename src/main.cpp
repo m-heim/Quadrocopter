@@ -3,15 +3,16 @@
 #include "nrf24l01_provider.hpp"
 #include "mcapp.hpp"
 #include "utils.hpp"
-#include <ADXL345_WE.h>
+#include <Adafruit_MPU6050.h>
 
-#define SENDER 0
+#define SENDER 1
 #define PIEZO 4
 #define LED 5
 #define INVOLTAGE A7
 #define RECEIVER_SLEEP 20
 #define SENDER_SLEEP 40
 #define NO_MSG 450
+#define VOLTAGE 11.4
 
 #if SENDER == 1
 #define CE_PIN 7
@@ -28,8 +29,10 @@
 
 #define FRONT_LEFT FRONT | LEFT
 #define FRONT_RIGHT FRONT | RIGHT
-#define BACK_LEFT BAcK | LEFT
+#define BACK_LEFT BACK | LEFT
 #define BACK_RIGHT BACK | RIGHT
+
+#define EXPONENTIAL_FACTOR 0.45
 
 
 uint8_t msgBuf[PAYLOAD_LENGTH];
@@ -53,38 +56,80 @@ NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
 MCApp app = MCApp();
 
 #if SENDER == 0
-ADXL345_WE a = ADXL345_WE();
+sensors_event_t am, g, temp;
+Adafruit_MPU6050 a;
 #endif
 
-int8_t val = 0;
+int8_t vals[4] = {0, 0, 0, 0};
 
-ReceiverPayload payload;
+ReceiverPayload payload = {0, 0, 0, 0};
 
-xyzFloat gyro;
+bool motorsApply = false;
+bool gyroApply = false;
+bool gyro = false;
 
+double frontWeight = 0;
+double leftWeight = 0;
+
+uint64_t v = millis();
+
+#if SENDER == 0
 void setSpeeds(ReceiverPayload p) {
   float speeds[4];
-  double frontWeight = ((gyro.x - (-10)) * (127.0/90.0) / 4);
-  double leftWeight = ((gyro.y - 4) * (127.0/90.0) / 4);
-  if (abs(frontWeight) < 4) {
+  float xAcc = am.acceleration.x;
+  float yAcc = am.acceleration.y;
+  float zAcc = am.acceleration.z;
+  float alphaX1 = atan((yAcc)/sqrt(pow((xAcc),2) + pow((zAcc),2))) * 57.29577951308232;
+  float alphaY1 = atan(-1*(xAcc)/sqrt(pow((yAcc),2) + pow((zAcc),2))) * 57.29577951308232;
+  float alphaX = (alphaX1 * 0.45) + 0.58;
+  float alphaY = (alphaY1 * 0.45) + 1;
+  float xGyro = g.gyro.x * 4.5 + 0.25;
+  float yGyro = g.gyro.y * 4.5 + 0.07;
+  float leftWeightVal = xGyro * 0.5 + alphaX * 0.5;
+  float frontWeightVal = -(yGyro * 0.5 + alphaY * 0.5);
+  leftWeight = (EXPONENTIAL_FACTOR * leftWeightVal) + ((1 - EXPONENTIAL_FACTOR) * leftWeight);
+  frontWeight = (EXPONENTIAL_FACTOR * frontWeightVal) + ((1 - EXPONENTIAL_FACTOR) * frontWeight);
+  /*if (abs(frontWeight) < 0.4) {
     frontWeight = 0;
+  } else */
+  if (frontWeight < -4) {
+    frontWeight = -4;
+  } else if (frontWeight > 4) {
+    frontWeight = 4;
   }
-  if (abs(leftWeight) < 4) {
+  /*if (abs(leftWeight) < 0.4) {
     leftWeight = 0;
+  } else */
+  if (leftWeight < -4) {
+    leftWeight = -4;
+  } else if (leftWeight > 4) {
+    leftWeight = 4;
   }
   for (int i = 0; i < 4; i++)
   {
     speeds[i] = p.speed;
     if (i & BACK) {
-      speeds[i] -= frontWeight;
+      speeds[i] += p.pitch / 18;
     } else {
-      speeds[i] += frontWeight;
+      speeds[i] -= p.pitch / 18;
     }
     if (i & RIGHT) {
-      speeds[i] -= leftWeight;
+      speeds[i] += p.roll / 18;
+    } else {
+      speeds[i] -= p.roll / 18;
     }
-    else {
-      speeds[i] += leftWeight;
+    if (gyroApply) {
+      if (i & BACK) {
+        speeds[i] -= frontWeight;
+      } else {
+        speeds[i] += frontWeight;
+      }
+      if (i & RIGHT) {
+        speeds[i] -= leftWeight;
+      }
+      else {
+        speeds[i] += leftWeight;
+      }
     }
   }
   for (int i = 0; i < 4; i++)
@@ -92,41 +137,36 @@ void setSpeeds(ReceiverPayload p) {
     int v = 1000;
     float s = speeds[i];
     s = s / 127;
-    v += 1000 * s;
-    if (v > 2000) {
-      v = 2000;
+    v += 800 * s;
+    if (v > 1800) {
+      v = 1800;
     }
     if (v < 1000) {
+      v = 1000;
+    }
+    if (!motorsApply) {
       v = 1000;
     }
     servos[i].writeMicroseconds(v);
   }
   char buf[189];
-  sprintf(buf, "%d %d %d %d %d %d %d", (int) gyro.x, (int) gyro.y, (int) gyro.z, (int) speeds[0], (int) speeds[1], (int) speeds[2], (int) speeds[3]);
+  sprintf(buf, "%d %d %d %d %d %d %d %d %d %d", (int) (alphaX * 1000), (int) (alphaY * 1000), (int) (xGyro * 1000), (int) (yGyro * 1000), (int) frontWeight, (int) leftWeight, (int) speeds[0], (int) speeds[1], (int) speeds[2], (int) speeds[3]);
   app.log(buf);
 }
 
 void noPackageAction() {
-  payload.speed = 0;
-  app.buzz(freq, 10);
   app.setLed(1);
+  app.buzz(freq, 10);
   freq += 400;
   if (freq > 4000)
   {
     freq = FREQ_BASE;
   }
 }
-
-int getXRotation() {
-
-}
+#endif
 
 void setup()
 {
-  payload.speed = 0;
-  payload.pitch = 0;
-  payload.roll = 0;
-  payload.yaw = 0;
   pinMode(LED_BUILTIN, OUTPUT);
   app.initLog(9600);
   // put your setup code here, to run once:
@@ -143,21 +183,29 @@ void setup()
 #if SENDER == 0
   app.initPiezo(PIEZO);
   app.setNoPiezo(true);
-  app.initVoltage(INVOLTAGE, 3);
+  app.initVoltage(INVOLTAGE, 3, VOLTAGE);
   app.initLed(LED);
-  Wire.begin();
-  if (!a.init()) {
-    app.log("Accelerometer is not working properly");
-    app.ledError();
+  for (int i = 0; i < 10; i++) {
+    bool a1 = a.begin();
+    if (a1) {
+      app.log("Accelerometer is working");
+      a.setGyroRange(MPU6050_RANGE_500_DEG);
+      a.setFilterBandwidth(MPU6050_BAND_184_HZ);
+      a.setSampleRateDivisor(7);
+      gyro = true;
+      break;
+    }
+    if (i == 9) {
+      app.log("Accelerometer is not working");
+    }
   }
-  a.measureAngleOffsets();
-  a.setDataRate(ADXL343_DATA_RATE_800);
   for (int i = 0; i < 4; i++)
   {
     app.buzz(1000 + i * 100, 40);
     delay(40);
   }
   pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
+  pinMode(INVOLTAGE, INPUT);
   radio.getRadio().openReadingPipe(1, address[0]);
   radio.getRadio().startListening();
   delay(400);
@@ -166,7 +214,8 @@ void setup()
     servos[i].attach(servoPins[i]);
     servos[i].writeMicroseconds(1000);
   }
-/*  for (int i = 0; i < 4; i++)
+  /*delay(4000);
+  for (int i = 0; i < 4; i++)
   {
     servos[i].writeMicroseconds(1000);
   }*/
@@ -184,25 +233,19 @@ void loop()
   bool hasPackage = false;
   int action = 1;
 #if SENDER == 1
-  int8_t uartData[4] = {0, 0, 0, 0};
+  int8_t uartData[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   if (Serial) // read from uart
   {
     Serial.setTimeout(10);
-    int s = Serial.readBytesUntil('\n', (char *)uartData, 4);
+    int s = Serial.readBytesUntil('\n', (char *)uartData, sizeof(uartData) - 1);
     if (s <= 1)
     {
       app.log("No action");
     }
-    else if (s >= 2 && uartData[0] == 'c')
+    else if (s >= 5 && uartData[0] == 'c')
     {
-      val = uartData[1];
+      memcpy(vals, uartData + 1, 4);
       app.log("Got speed change");
-    }
-    else if (s >= 2 && uartData[0] == 's') {
-      app.log("God steer change");
-    } else
-    {
-      app.log("Unknown action");
     }
   }
   if (!isConnected)
@@ -218,10 +261,10 @@ void loop()
     msgBuf[1] = 4;
     payloadLength = 2 + sizeof(ReceiverPayload);
     ReceiverPayload p;
-    p.speed = val;
-    p.pitch = 0;
-    p.yaw = 0;
-    p.roll = 0;
+    p.speed = vals[0];
+    p.pitch = vals[1];
+    p.yaw = vals[2];
+    p.roll = vals[3];
     memcpy(msgBuf + 2, &p, sizeof(p));
     app.log("Sending control");
     app.log("Speed");
@@ -247,11 +290,11 @@ void loop()
   delay(SENDER_SLEEP);
 #else
   app.setLed(0);
-  if (!a.getAngles(&gyro)) {
-    app.log("Accelerometer is not working");
-    gyro.x = 0;
-    gyro.y = 0;
-    gyro.z = 0;
+  motorsApply = false;
+  gyroApply = false;
+  if (gyro) {
+    a.getEvent(&am, &g, &temp);
+    gyroApply = true;
   }
   if (radio.getRadio().available())
   { // is there a payload? get the pipe number that recieved it
@@ -315,6 +358,11 @@ void loop()
   }
   else
   {
+    motorsApply = true;
+  }
+  if (!app.verifyVoltage()) {
+    app.log("Voltage");
+    /*motorsApply = false;*/
   }
   setSpeeds(payload);
   delay(RECEIVER_SLEEP);

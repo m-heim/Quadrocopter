@@ -20,19 +20,23 @@ public:
         }
         else
         {
-            (analogRead(voltagePin) / 1024) * voltageFactor;
+            return (analogRead(voltagePin) / 1024) * voltageFactor;
         }
+    }
+    inline bool verifyVoltage() {
+        return getVoltage() > voltage;
     }
     inline void initPiezo(int pin)
     {
         pinMode(pin, OUTPUT);
         piezoPin = pin;
     }
-    inline void initVoltage(int pin, float factor)
+    inline void initVoltage(int pin, float factor, float v)
     {
         pinMode(pin, INPUT);
         voltagePin = pin;
         voltageFactor = factor;
+        voltage = v;
     }
     inline void buzz(int freq, int dur)
     {
@@ -99,13 +103,13 @@ public:
         this->setLed(ledState);
         ledState = !ledState;
     }
-    CommunicationProvider &communication;
 
 private:
     int voltagePin = -1;
     int piezoPin = -1;
     int ledPin = -1;
     float voltageFactor = 1;
+    float voltage = 0;
     bool ledState = false;
     bool noPiezo = false;
 };

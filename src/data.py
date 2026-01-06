@@ -11,14 +11,16 @@ DEBUG = True
 JOYSTICK_NUM = 0
 SPEED_AXIS = 1
 STEER_AXIS = 3
+YAW_AXIS = 0
+ROLL_AXIS = 2
 BRAKE_BUTTON = 4
 AXIS_BUTTON = 5
 
-def data_send(s, speed: float, steer: float) -> None:
+def data_send(s, speed: float, steer: float,  yaw: float, roll: float) -> None:
     #print("Sending data" +  str(speed) + str(steer))
     #print(int.to_bytes(int(speed * 127), length=1, signed=True))
     #print(int.to_bytes(int(steer * 127), length=1, signed=True))
-    data = b'c' + int.to_bytes(int(speed * 127), length=1, signed=True) + b'\n' + b'r' + int.to_bytes(int(steer * 127), length=1, signed=True) + b'\n'
+    data = b'c' + int.to_bytes(int(speed * 127), length=1, signed=True) + int.to_bytes(int(steer * 127), length=1, signed=True) + int.to_bytes(int(yaw * 127), length=1, signed=True) + int.to_bytes(int(roll * 127), length=1, signed=True) + b'\n'
     s.write(data)
     #print("Data" + str(list(data)))
 
@@ -45,6 +47,8 @@ def main():
         while True:
             pygame.event.pump()
             steer = joystick_read_axis(joysticks[JOYSTICK_NUM], STEER_AXIS)
+            yaw = joystick_read_axis(joysticks[JOYSTICK_NUM], YAW_AXIS)
+            roll = joystick_read_axis(joysticks[JOYSTICK_NUM], ROLL_AXIS)
             brake = joystick_read_button(joysticks[JOYSTICK_NUM], BRAKE_BUTTON)
             axis = joystick_read_button(joysticks[JOYSTICK_NUM], AXIS_BUTTON)
             if brake == 0:
@@ -52,15 +56,19 @@ def main():
                 if speed < 0:
                     speed = 0
                 elif axis:
-                    speed = 0.3 + (speed * 0.7)
+                    speed = 0.19 + (speed * 0.81)
             else:
                 speed = 0.0
             steer = round(steer, 3)
             speed = round(speed, 3)
             if DEBUG:
-                print(f'Speed: {speed}, Steer: {steer}')
-            data_send(s, speed, steer)
-            #print("Got data: " + s.readline().decode('utf-8', errors='ignore'))
+                print(f'Speed: {speed}, Steer: {steer}, Yaw: {yaw}, Roll: {roll}')
+            data_send(s, speed, steer, yaw, roll)
+            for _ in range(10):
+                try:
+                    print("Got data: " + s.readline().decode('utf-8', errors='ignore'))
+                except:
+                    break
             time.sleep(0.2)
 
 if __name__ == '__main__':
