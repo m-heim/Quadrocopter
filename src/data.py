@@ -53,10 +53,10 @@ def main():
             axis = joystick_read_button(joysticks[JOYSTICK_NUM], AXIS_BUTTON)
             if brake == 0:
                 speed = - joystick_read_axis(joysticks[JOYSTICK_NUM], SPEED_AXIS)
-                if speed < 0:
+                if axis:
+                    speed = ((speed + 1) * 0.5)
+                elif speed < 0:
                     speed = 0
-                elif axis:
-                    speed = 0.19 + (speed * 0.81)
             else:
                 speed = 0.0
             steer = round(steer, 3)
