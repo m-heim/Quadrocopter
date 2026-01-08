@@ -18,6 +18,7 @@ NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
 MCApp app = MCApp();
 ReceiverPayload payload = {0, 0, 0, 0};
 double vals1[4];
+int8_t vals[4];
 
 #if SENDER == 0
 sensors_event_t am, g, temp;
@@ -41,6 +42,31 @@ double gravity[2];
 // previous message
 long msg_a = 0;
 #endif
+
+#if SENDER == 0
+void initServos()
+{
+  for (int i = 0; i < 4; i++)
+  {
+    servos[i].attach(servoPins[i]);
+  }
+}
+
+void setServos(int speed)
+{
+  for (int i = 0; i < 4; i++)
+  {
+    servos[i].writeMicroseconds(speed);
+  }
+}
+
+void setMotors()
+{
+  setServos(2000);
+  delay(4000);
+  setServos(1000);
+  delay(4000);
+}
 
 void setGravity()
 {
@@ -81,14 +107,6 @@ void setGravity()
   app.log("Setting gravity ok");
 }
 
-void setMotors()
-{
-  setServos(2000);
-  delay(4000);
-  setServos(1000);
-  delay(4000);
-}
-
 void setAlpha()
 {
   float xAcc = am.acceleration.x;
@@ -112,15 +130,14 @@ void setValues()
   setGyro();
 }
 
-#if SENDER == 0
 void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
 {
   float speeds[4];
   setValues();
   pitchVal = filters[1].update(pids[1].update(alphaY, p.pitch / 8, 1));
   rollVal = filters[2].update(pids[2].update(alphaX, p.roll / 8, 1));
-  double pp = inRange(pitchVal, -8, 8) - (yGyro / 4);
-  double rr = inRange(rollVal, -8, 8) + (xGyro / 4);
+  double pp = inRange(pitchVal, -8, 8); // - (yGyro / 4);
+  double rr = inRange(rollVal, -8, 8);  // + (xGyro / 4);
   for (int i = 0; i < 4; i++)
   {
     speeds[i] = p.speed;
@@ -179,7 +196,6 @@ void noPackageAction()
     freq = FREQ_BASE;
   }
 }
-#endif
 
 void output(int start, int stop, int step, float seconds)
 {
@@ -188,22 +204,6 @@ void output(int start, int stop, int step, float seconds)
   {
     app.buzz(i, s);
     delay(s);
-  }
-}
-
-void initServos()
-{
-  for (int i = 0; i < 4; i++)
-  {
-    servos[i].attach(servoPins[i]);
-  }
-}
-
-void setServos(int speed)
-{
-  for (int i = 0; i < 4; i++)
-  {
-    servos[i].writeMicroseconds(speed);
   }
 }
 
@@ -230,6 +230,8 @@ void printVoltage()
     Serial.print("\n");
   }
 }
+#endif
+
 void setup()
 {
   vals1[0] = 4;
@@ -255,8 +257,8 @@ void setup()
 #if SENDER == 0
   for (int i = 0; i < 4; i++)
   {
-    pids[0] = PID(0.8, 0.004, 0.8);
-    filters[0] = Filter(0.45);
+    pids[i] = PID(0.8, 0.004, 0.8);
+    filters[i] = Filter(0.45);
   }
   app.initPiezo(PIEZO);
   app.setNoPiezo(true);
@@ -310,7 +312,7 @@ void loop()
   {
     Serial.setTimeout(10);
     int s = Serial.readBytesUntil('\n', (char *)uartData, sizeof(uartData) - 1);
-    if (s <= 1)
+    if (s < 1)
     {
       app.log("No action");
     }
@@ -318,6 +320,13 @@ void loop()
     {
       memcpy(vals, uartData + 1, 4);
       app.log("Got speed change");
+    }
+    else if(uartData[0] == 's') {
+      app.log("Sending setup");
+      msgBuf[0] = GYRO_SETUP;
+      msgBuf[1] = 0;
+      payloadLength = 2;
+      bool report = radio.getRadio().write(&msgBuf, payloadLength);
     }
   }
   if (!isConnected)
