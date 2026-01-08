@@ -23,7 +23,8 @@ public:
             return (analogRead(voltagePin) / 1024) * voltageFactor;
         }
     }
-    inline bool verifyVoltage() {
+    inline bool verifyVoltage()
+    {
         return getVoltage() > voltage;
     }
     inline void initPiezo(int pin)
@@ -40,7 +41,8 @@ public:
     }
     inline void buzz(int freq, int dur)
     {
-        if (noPiezo) {
+        if (noPiezo)
+        {
             return;
         }
         if (piezoPin == -1)
@@ -79,9 +81,10 @@ public:
         pinMode(pin, OUTPUT);
         this->ledPin = pin;
     }
-    inline void infinite() {
-        while (1) {
-
+    inline void infinite()
+    {
+        while (1)
+        {
         }
     }
     inline void setLed(int val)
@@ -95,7 +98,8 @@ public:
             digitalWrite(ledPin, val);
         }
     }
-    inline void setNoPiezo(bool v) {
+    inline void setNoPiezo(bool v)
+    {
         noPiezo = v;
     }
     inline void ledToggle()

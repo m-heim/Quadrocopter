@@ -7,6 +7,7 @@ import time
 import serial
 import atexit
 
+
 DEBUG = True
 JOYSTICK_NUM = 0
 SPEED_AXIS = 1

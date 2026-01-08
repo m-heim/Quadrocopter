@@ -257,7 +257,7 @@ void setup()
 #if SENDER == 0
   for (int i = 0; i < 4; i++)
   {
-    pids[i] = PID(0.8, 0.004, 0.8);
+    pids[i] = PID(0.45, 0.00045, 0.45);
     filters[i] = Filter(0.45);
   }
   app.initPiezo(PIEZO);
@@ -321,7 +321,8 @@ void loop()
       memcpy(vals, uartData + 1, 4);
       app.log("Got speed change");
     }
-    else if(uartData[0] == 's') {
+    else if (uartData[0] == 's')
+    {
       app.log("Sending setup");
       msgBuf[0] = GYRO_SETUP;
       msgBuf[1] = 0;
