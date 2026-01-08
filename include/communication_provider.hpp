@@ -12,6 +12,8 @@ enum
     CONTROL,
     STATUS_SENDER,
     STATUS_RECEIVER,
+    GYRO_SETUP,
+    MOTOR_SETUP
 } MessageType;
 
 struct Message

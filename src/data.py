@@ -46,7 +46,7 @@ def main():
         print(f'Found {pygame.joystick.get_count()} joysticks on ports')
         while True:
             pygame.event.pump()
-            steer = joystick_read_axis(joysticks[JOYSTICK_NUM], STEER_AXIS)
+            steer = -joystick_read_axis(joysticks[JOYSTICK_NUM], STEER_AXIS)
             yaw = joystick_read_axis(joysticks[JOYSTICK_NUM], YAW_AXIS)
             roll = joystick_read_axis(joysticks[JOYSTICK_NUM], ROLL_AXIS)
             brake = joystick_read_button(joysticks[JOYSTICK_NUM], BRAKE_BUTTON)
