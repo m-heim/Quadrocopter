@@ -10,6 +10,7 @@
 #define NO_MSG 450
 #define VOLTAGE 11.4
 #define GRAVITY 4000
+#define DEBUG 0
 
 #if SENDER == 1
 #define CE_PIN 7

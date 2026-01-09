@@ -5,6 +5,14 @@
 
 enum
 {
+    IDLE = 20,
+    OK,
+    ERROR,
+    BATTERY
+} Status;
+
+enum
+{
     HELLO = 10,
     BYE,
     CONFIG,
@@ -29,6 +37,14 @@ struct ReceiverPayload
     int8_t pitch;
     int8_t roll;
     int8_t yaw;
+};
+
+struct SenderPayload {
+    int8_t speeds[4];
+    float position1[3];
+    float position2[3];
+    float voltage;
+
 };
 
 class CommunicationProvider

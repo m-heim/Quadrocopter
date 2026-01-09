@@ -4,7 +4,7 @@
 #include "mcapp.hpp"
 #include "utils.hpp"
 #include <Adafruit_MPU6050.h>
-#include "main.hpp"
+#include "init.hpp"
 #include "pid.hpp"
 
 uint8_t msgBuf[PAYLOAD_LENGTH];
@@ -17,6 +17,7 @@ int radioNumber = SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to
 NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
 MCApp app = MCApp();
 ReceiverPayload payload = {0, 0, 0, 0};
+SenderPayload payload2 = {0};
 double vals1[4];
 int8_t vals[4];
 

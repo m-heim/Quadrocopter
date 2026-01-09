@@ -34,7 +34,7 @@ private:
     bool useIntegralRange = false;
     double kp, ki, kd;
     double prev_err;
-    double val;
+    double val = 0;
     double error = 0;
     double error_sum = 0;
     double error_derivative = 0;
@@ -55,6 +55,9 @@ public:
     double update(double value)
     {
         val = (factor * value) + ((1 - factor) * val);
+        return getValue();
+    }
+    double getValue() {
         return val;
     }
 

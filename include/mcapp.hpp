@@ -1,6 +1,7 @@
 #ifndef MCAPP_HPP_
 #define MCAPP_HPP_
 #define MCAPP_VERSION 1
+#include "init.hpp"
 #include "Arduino.h"
 #include "communication_provider.hpp"
 
@@ -63,18 +64,22 @@ public:
     }
     inline void initLog(long baud)
     {
+        #if DEBUG == 1
         if (Serial)
         {
             Serial.begin(baud);
             Serial.println("Serial init");
         }
+        #endif
     }
     inline void log(char *msg)
     {
+        #if DEBUG == 1
         if (Serial)
         {
             Serial.println(msg);
         }
+        #endif
     }
     inline void initLed(int pin)
     {
