@@ -9,4 +9,9 @@
 #define MOTOR_2_PWM_L 9
 #define MOTOR_2_EN_L A1
 #define MOTOR_2_EN_R A2
+void motor_1_setup(int status);
+
+void motor_2_setup(int status);
+
+void drive(int8_t speed, int8_t steering);
 #endif

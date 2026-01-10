@@ -6,6 +6,7 @@
 #include <Adafruit_MPU6050.h>
 #include "init.hpp"
 #include "pid.hpp"
+#include "vehicle.hpp"
 
 uint8_t msgBuf[PAYLOAD_LENGTH];
 uint8_t payloadLength = 0;
@@ -18,6 +19,7 @@ NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
 MCApp app = MCApp();
 ReceiverPayload payload = {0, 0, 0, 0};
 SenderPayload payload2 = {0};
+int freq = FREQ_DEFAULT;
 double vals1[4];
 int8_t vals[4];
 
@@ -26,7 +28,6 @@ sensors_event_t am, g, temp;
 Adafruit_MPU6050 a;
 int servoPins[4] = {A0, A1, A2, A3};
 Servo servos[4];
-int freq = FREQ_DEFAULT;
 bool gyro = false;
 
 double pitchVal = 0;
@@ -42,9 +43,7 @@ uint64_t start = millis();
 double gravity[2];
 // previous message
 long msg_a = 0;
-#endif
-
-#if SENDER == 0
+#if VEHICLE == 0
 void initServos()
 {
   for (int i = 0; i < 4; i++)
@@ -135,8 +134,8 @@ void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
 {
   float speeds[4];
   setValues();
-  pitchVal = filters[1].update(pids[1].update(alphaY, p.pitch / 8, 1));
-  rollVal = filters[2].update(pids[2].update(alphaX, p.roll / 8, 1));
+  pitchVal = filters[1].update(pids[1].update(alphaY, p.pitch / 4, 1));
+  rollVal = filters[2].update(pids[2].update(alphaX, p.roll / 4, 1));
   double pp = inRange(pitchVal, -8, 8); // - (yGyro / 4);
   double rr = inRange(rollVal, -8, 8);  // + (xGyro / 4);
   for (int i = 0; i < 4; i++)
@@ -187,24 +186,37 @@ void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
   app.log(buf);
 }
 
+void printVoltage()
+{
+  if (Serial)
+  {
+    Serial.print("Voltage: ");
+    Serial.print((int)app.getVoltage(), DEC);
+    Serial.print("V");
+    Serial.print("\n");
+  }
+}
+#endif
+#if VEHICLE == 1
+void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply) {
+  if (motorsApply) {
+    drive(p.speed * 0.8, p.roll * 0.45);
+  } else {
+    drive(0, 0);
+  }
+}
+#endif
+#endif
+
 void noPackageAction()
 {
+  app.log("No package");
   app.setLed(1);
   app.buzz(freq, 10);
   freq += 400;
   if (freq > 4000)
   {
     freq = FREQ_BASE;
-  }
-}
-
-void output(int start, int stop, int step, float seconds)
-{
-  int s = (int)((seconds / 1000));
-  for (int i = start; i <= stop; i += step)
-  {
-    app.buzz(i, s);
-    delay(s);
   }
 }
 
@@ -221,25 +233,12 @@ void printPayload()
   }
 }
 
-void printVoltage()
-{
-  if (Serial)
-  {
-    Serial.print("Voltage: ");
-    Serial.print((int)app.getVoltage(), DEC);
-    Serial.print("V");
-    Serial.print("\n");
-  }
-}
-#endif
-
 void setup()
 {
   vals1[0] = 4;
   vals1[1] = 8;
   vals1[2] = 16;
   vals1[3] = 180;
-  pinMode(LED_BUILTIN, OUTPUT);
   app.initLog(9600);
   // put your setup code here, to run once:
   if (!radio.init())
@@ -251,20 +250,16 @@ void setup()
   {
     app.log("Nrf radio successfully connected");
   }
-#if VEHICLE == 1
-  motor_1_setup(1);
-  motor_2_setup(1);
-#endif
 #if SENDER == 0
+  //app.initLed(LED_BUILTIN);
+  //app.initPiezo(PIEZO);
+  //app.initVoltage(INVOLTAGE, 3, 8);
+  #if VEHICLE == 0
   for (int i = 0; i < 4; i++)
   {
     pids[i] = PID(0.45, 0.00045, 0.45);
     filters[i] = Filter(0.45);
   }
-  app.initPiezo(PIEZO);
-  app.setNoPiezo(true);
-  app.initVoltage(INVOLTAGE, 3, VOLTAGE);
-  app.initLed(LED);
   for (int i = 0; i < 10; i++)
   {
     bool a1 = a.begin();
@@ -286,14 +281,18 @@ void setup()
     delay(10);
   }
   output(1000, 1300, 100, 0.04);
+  initServos();
+  setServos(1000);
+  //setMotors();
+  #endif
+  #if VEHICLE == 1
+  motor_1_setup(1);
+  motor_2_setup(1);
+  #endif
   pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
-  pinMode(INVOLTAGE, INPUT);
   radio.getRadio().openReadingPipe(1, address[0]);
   radio.getRadio().startListening();
   delay(400);
-  initServos();
-  setServos(1000);
-  // setMotors();
   delay(100);
 #else
   app.log("Setting up radio for sender");
@@ -390,17 +389,19 @@ void loop()
     {
       isConnected = true;
       app.log("Hello from sender");
-      output(500, 900, 100, 0.04);
+      app.output(500, 900, 100, 0.04);
     }
     else if (msgBuf[0] == BYE)
     {
       isConnected = false;
       app.log("Bye from sender");
-      output(900, 500, -100, 0.04);
+      app.output(900, 500, -100, 0.04);
     }
     else if (msgBuf[0] == GYRO_SETUP)
     {
+      #if VEHICLE == 0
       setGravity();
+      #endif
     }
     else if (msgBuf[0] == MOTOR_SETUP)
     {

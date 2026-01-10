@@ -8,7 +8,18 @@
 class MCApp
 {
 public:
-    MCApp() {}
+    MCApp() {
+        pinMode(LED_BUILTIN, OUTPUT);
+    }
+    inline void output(int start, int stop, int step, float seconds)
+    {
+    int s = (int)((seconds / 1000));
+    for (int i = start; i <= stop; i += step)
+    {
+        buzz(i, s);
+        delay(s);
+    }
+    }
     inline int getVersion()
     {
         return MCAPP_VERSION;
@@ -17,7 +28,7 @@ public:
     {
         if (voltagePin == -1)
         {
-            ledError();
+            return 0;
         }
         else
         {
@@ -26,7 +37,7 @@ public:
     }
     inline bool verifyVoltage()
     {
-        return getVoltage() > voltage;
+        return (voltagePin == -1) || (getVoltage() > voltage);
     }
     inline void initPiezo(int pin)
     {
@@ -42,13 +53,9 @@ public:
     }
     inline void buzz(int freq, int dur)
     {
-        if (noPiezo)
-        {
-            return;
-        }
         if (piezoPin == -1)
         {
-            ledError();
+            return;
         }
         tone(piezoPin, freq, dur);
     }
@@ -64,13 +71,11 @@ public:
     }
     inline void initLog(long baud)
     {
-        #if DEBUG == 1
         if (Serial)
         {
             Serial.begin(baud);
             Serial.println("Serial init");
         }
-        #endif
     }
     inline void log(char *msg)
     {
@@ -96,16 +101,12 @@ public:
     {
         if (this->ledPin == -1)
         {
-            this->ledError();
+            return;
         }
         else
         {
             digitalWrite(ledPin, val);
         }
-    }
-    inline void setNoPiezo(bool v)
-    {
-        noPiezo = v;
     }
     inline void ledToggle()
     {
@@ -120,6 +121,5 @@ private:
     float voltageFactor = 1;
     float voltage = 0;
     bool ledState = false;
-    bool noPiezo = false;
 };
 #endif

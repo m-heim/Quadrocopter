@@ -64,8 +64,8 @@ def main():
                 speed = - joystick_read_axis(joysticks[JOYSTICK_NUM], SPEED_AXIS)
                 if axis:
                     speed = ((speed + 1) * 0.5)
-                elif speed < 0:
-                    speed = 0
+                #elif speed < 0:
+                #    speed = 0
             else:
                 speed = 0.0
             steer = round(steer, 3)
@@ -75,9 +75,10 @@ def main():
             data_send(s, speed, steer, yaw, roll)
             if setting:
                 setting_send(s)
-            for _ in range(10):
+            for _ in range(1):
                 try:
-                    print("Got data: " + s.readline().decode('utf-8', errors='ignore'))
+                    print("")
+                    #print("Got data: " + s.readline().decode('utf-8', errors='ignore'))
                 except:
                     break
             time.sleep(0.2)

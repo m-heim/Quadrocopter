@@ -5,13 +5,13 @@ void motor_1_drive(int8_t speed)
 {
     if (speed > 0)
     {
-        analogWrite(MOTOR_1_PWM_L, speed * 8);
+        analogWrite(MOTOR_1_PWM_L, speed * 2);
         analogWrite(MOTOR_1_PWM_R, 0);
     }
-    if (speed < 0)
+    else if (speed < 0)
     {
         analogWrite(MOTOR_1_PWM_L, 0);
-        analogWrite(MOTOR_1_PWM_R, speed * 8);
+        analogWrite(MOTOR_1_PWM_R, (speed * -2));
     }
     else
     {
@@ -24,13 +24,13 @@ void motor_2_drive(int8_t speed)
 {
     if (speed > 0)
     {
-        analogWrite(MOTOR_2_PWM_L, speed * 8);
+        analogWrite(MOTOR_2_PWM_L, speed * 2);
         analogWrite(MOTOR_2_PWM_R, 0);
     }
-    if (speed < 0)
+    else if (speed < 0)
     {
         analogWrite(MOTOR_2_PWM_L, 0);
-        analogWrite(MOTOR_2_PWM_R, speed * 8);
+        analogWrite(MOTOR_2_PWM_R, (speed * -2));
     }
     else
     {
@@ -41,12 +41,22 @@ void motor_2_drive(int8_t speed)
 
 void motor_1_setup(int status)
 {
+    pinMode(MOTOR_1_EN_L, OUTPUT);
+    pinMode(MOTOR_1_EN_R, OUTPUT);
+    pinMode(MOTOR_1_PWM_L, OUTPUT);
+    pinMode(MOTOR_1_PWM_R, OUTPUT);
+    motor_1_drive(0);
     digitalWrite(MOTOR_1_EN_L, status);
     digitalWrite(MOTOR_1_EN_R, status);
 }
 
 void motor_2_setup(int status)
 {
+    pinMode(MOTOR_2_EN_L, OUTPUT);
+    pinMode(MOTOR_2_EN_R, OUTPUT);
+    pinMode(MOTOR_2_PWM_L, OUTPUT);
+    pinMode(MOTOR_2_PWM_R, OUTPUT);
+    motor_2_drive(0);
     digitalWrite(MOTOR_2_EN_L, status);
     digitalWrite(MOTOR_2_EN_R, status);
 }
