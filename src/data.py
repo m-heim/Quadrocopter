@@ -75,12 +75,12 @@ def main():
             data_send(s, speed, steer, yaw, roll)
             if setting:
                 setting_send(s)
-            for _ in range(1):
-                try:
-                    print("")
+            #for _ in range(1):
+                #try:
+                    #print("")
                     #print("Got data: " + s.readline().decode('utf-8', errors='ignore'))
-                except:
-                    break
+                #except:
+                    #break
             time.sleep(0.2)
 
 if __name__ == '__main__':

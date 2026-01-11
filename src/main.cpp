@@ -8,20 +8,18 @@
 #include "pid.hpp"
 #include "vehicle.hpp"
 
-uint8_t msgBuf[PAYLOAD_LENGTH];
 uint8_t payloadLength = 0;
-bool isConnected = false;
 uint8_t address[][6] = {"Send1", "Recv1"};
 // It is very helpful to think of an address as a path instead of as
 // an identifying device destination
 int radioNumber = SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
 NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
-MCApp app = MCApp();
-ReceiverPayload payload = {0, 0, 0, 0};
+MCApp app = MCApp(&radio);
 SenderPayload payload2 = {0};
 int freq = FREQ_DEFAULT;
 double vals1[4];
 int8_t vals[4];
+long msg_b;
 
 #if SENDER == 0
 sensors_event_t am, g, temp;
@@ -41,8 +39,7 @@ Filter filters[4];
 uint64_t start = millis();
 // what angle we are by default
 double gravity[2];
-// previous message
-long msg_a = 0;
+int index = 0;
 #if VEHICLE == 0
 void initServos()
 {
@@ -107,15 +104,46 @@ void setGravity()
   app.log("Setting gravity ok");
 }
 
+void initGyro() {
+    bool a1 = a.begin();
+    if (a1)
+    {
+      app.log("Accelerometer is working");
+      a.setGyroRange(MPU6050_RANGE_500_DEG);
+      a.setFilterBandwidth(MPU6050_BAND_184_HZ);
+      a.setSampleRateDivisor(7);
+      delay(100);
+      gyro = true;
+      //setGravity();
+    }
+    else {
+      app.log("Accelerometer is not working");
+    }
+}
+
+
 void setAlpha()
 {
   float xAcc = am.acceleration.x;
   float yAcc = am.acceleration.y;
   float zAcc = am.acceleration.z;
-  alphaX = atan((yAcc) / sqrt(pow((xAcc), 2) + pow((zAcc), 2))) * 57.29577951308232;
-  alphaY = atan(-1 * (xAcc) / sqrt(pow((yAcc), 2) + pow((zAcc), 2))) * 57.29577951308232;
-  alphaX -= gravity[0];
-  alphaY -= gravity[1];
+  float alphaX1 = atan((yAcc) / sqrt(pow((xAcc), 2) + pow((zAcc), 2))) * 57.29577951308232;
+  float alphaY1 = atan(-1 * (xAcc) / sqrt(pow((yAcc), 2) + pow((zAcc), 2))) * 57.29577951308232;
+  alphaX1 -= gravity[0];
+  alphaY1 -= gravity[0];
+  alphaX = (LP * alphaX) + ((1 - LP) * alphaX1);
+  alphaY = (LP * alphaY) + ((1 - LP) * alphaY1);
+  if (isnan(alphaX) || isnan(alphaY)) {
+    app.log("Nan");
+    alphaX = 0;
+    alphaY = 0;
+    if (index == 18) {
+      initGyro();
+      index = 0;
+    } else {
+      index += 1;
+    }
+  }
 }
 
 void setGyro()
@@ -134,10 +162,10 @@ void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
 {
   float speeds[4];
   setValues();
-  pitchVal = filters[1].update(pids[1].update(alphaY, p.pitch / 4, 1));
-  rollVal = filters[2].update(pids[2].update(alphaX, p.roll / 4, 1));
-  double pp = inRange(pitchVal, -8, 8); // - (yGyro / 4);
-  double rr = inRange(rollVal, -8, 8);  // + (xGyro / 4);
+  pitchVal = filters[1].update(pids[1].update(alphaY, app.getPayload().pitch / 4, 1));
+  rollVal = filters[2].update(pids[2].update(alphaX, app.getPayload().roll / 4, 1));
+  double pp = inRange(pitchVal, -16, 16); // - (yGyro / 4);
+  double rr = inRange(rollVal, -16, 16);  // + (xGyro / 4);
   for (int i = 0; i < 4; i++)
   {
     speeds[i] = p.speed;
@@ -208,31 +236,6 @@ void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply) {
 #endif
 #endif
 
-void noPackageAction()
-{
-  app.log("No package");
-  app.setLed(1);
-  app.buzz(freq, 10);
-  freq += 400;
-  if (freq > 4000)
-  {
-    freq = FREQ_BASE;
-  }
-}
-
-void printPayload()
-{
-  if (Serial)
-  {
-    app.log("Payload from sender: ");
-    Serial.print(payload.speed);
-    Serial.print(payload.yaw);
-    Serial.print(payload.pitch);
-    Serial.print(payload.roll);
-    Serial.print("\n");
-  }
-}
-
 void setup()
 {
   vals1[0] = 4;
@@ -251,14 +254,14 @@ void setup()
     app.log("Nrf radio successfully connected");
   }
 #if SENDER == 0
-  //app.initLed(LED_BUILTIN);
   //app.initPiezo(PIEZO);
-  //app.initVoltage(INVOLTAGE, 3, 8);
+  app.initVoltage(INVOLTAGE, 3, 8);
   #if VEHICLE == 0
+  app.initLed(LED);
   for (int i = 0; i < 4; i++)
   {
-    pids[i] = PID(0.45, 0.00045, 0.45);
-    filters[i] = Filter(0.45);
+    pids[i] = PID(0.18, 0.0, 0.18, -4, 4);
+    filters[i] = Filter(0.18);
   }
   for (int i = 0; i < 10; i++)
   {
@@ -267,7 +270,7 @@ void setup()
     {
       app.log("Accelerometer is working");
       a.setGyroRange(MPU6050_RANGE_500_DEG);
-      a.setFilterBandwidth(MPU6050_BAND_184_HZ);
+      a.setFilterBandwidth(MPU6050_BAND_5_HZ);
       a.setSampleRateDivisor(7);
       delay(100);
       gyro = true;
@@ -280,7 +283,7 @@ void setup()
     }
     delay(10);
   }
-  output(1000, 1300, 100, 0.04);
+  app.output(1000, 1300, 100, 0.04);
   initServos();
   setServos(1000);
   //setMotors();
@@ -296,6 +299,7 @@ void setup()
   delay(100);
 #else
   app.log("Setting up radio for sender");
+  Serial.setTimeout(10);
   pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
   radio.getRadio().openWritingPipe(address[0]);
   radio.getRadio().stopListening();
@@ -304,13 +308,12 @@ void setup()
 }
 void loop()
 {
-  bool hasPackage = false;
   int action = 1;
+  bool gyroSetup = false;
 #if SENDER == 1
   int8_t uartData[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   if (Serial) // read from uart
   {
-    Serial.setTimeout(10);
     int s = Serial.readBytesUntil('\n', (char *)uartData, sizeof(uartData) - 1);
     if (s < 1)
     {
@@ -320,58 +323,23 @@ void loop()
     {
       memcpy(vals, uartData + 1, 4);
       app.log("Got speed change");
+      msg_b = millis();
     }
     else if (uartData[0] == 's')
     {
       app.log("Sending setup");
-      msgBuf[0] = GYRO_SETUP;
-      msgBuf[1] = 0;
-      payloadLength = 2;
-      bool report = radio.getRadio().write(&msgBuf, payloadLength);
+      gyroSetup = true;
     }
   }
-  if (!isConnected)
-  {
-    msgBuf[0] = HELLO;
-    msgBuf[1] = 0;
-    payloadLength = 2;
-    app.log("Sending hello");
+  if ((millis() - msg_b) > NO_MSG) {
+    vals[0] = 0;
+    vals[1] = 0;
+    vals[2] = 0;
+    vals[3] = 0;
   }
-  else if (action == 1)
-  {
-    msgBuf[0] = CONTROL;
-    msgBuf[1] = 4;
-    payloadLength = 2 + sizeof(ReceiverPayload);
-    ReceiverPayload p;
-    p.speed = vals[0];
-    p.pitch = vals[1];
-    p.yaw = vals[2];
-    p.roll = vals[3];
-    memcpy(msgBuf + 2, &p, sizeof(p));
-    app.log("Sending control");
-    app.log("Speed");
-    char buf[45];
-    itoa(p.speed, buf, 10);
-    app.log(buf);
-  }
-  else
-  {
-    app.log("Unknown action");
-  }
-  bool report = radio.getRadio().write(&msgBuf, payloadLength);
-  if (report)
-  {
-    app.log("Message was successfully transmitted");
-    isConnected = true;
-  }
-  else
-  {
-    app.log("No ack from receiver");
-    isConnected = false;
-  }
+  app.handle2(vals, gyroSetup);
   delay(SENDER_SLEEP);
 #else
-  bool motorsApply = false;
   bool gyroApply = false;
   app.setLed(0);
   if (gyro)
@@ -379,63 +347,14 @@ void loop()
     a.getEvent(&am, &g, &temp);
     gyroApply = true;
   }
-  if (radio.getRadio().available())
-  { // is there a payload? get the pipe number that recieved it
-    hasPackage = true;
-    payloadLength = radio.getRadio().getPayloadSize(); // get the size of the payload
-    radio.getRadio().read(&msgBuf, payloadLength);     // fetch payload from FIFO
-
-    if (msgBuf[0] == HELLO)
-    {
-      isConnected = true;
-      app.log("Hello from sender");
-      app.output(500, 900, 100, 0.04);
-    }
-    else if (msgBuf[0] == BYE)
-    {
-      isConnected = false;
-      app.log("Bye from sender");
-      app.output(900, 500, -100, 0.04);
-    }
-    else if (msgBuf[0] == GYRO_SETUP)
-    {
-      #if VEHICLE == 0
-      setGravity();
-      #endif
-    }
-    else if (msgBuf[0] == MOTOR_SETUP)
-    {
-    }
-    else if (msgBuf[0] == CONTROL)
-    {
-      memcpy(&payload, msgBuf + 2, sizeof(payload));
-      msg_a = millis();
-      printPayload();
-    }
-    else
-    {
-      app.log("Invalid message");
-    }
-  }
-  else
-  {
-    app.log("Radio not available");
-  }
+  bool pkg = app.handle();
   /*printVoltage();*/
-  if (((millis() - msg_a) > NO_MSG))
-  {
-    noPackageAction();
-  }
-  else
-  {
-    motorsApply = true;
-  }
   if (!app.verifyVoltage())
   {
     app.log("Voltage");
     /*motorsApply = false;*/
   }
-  setSpeeds(payload, motorsApply, gyroApply);
+  setSpeeds(app.getPayload(), app.recentMessage(), gyroApply);
   delay(RECEIVER_SLEEP);
 #endif
 }

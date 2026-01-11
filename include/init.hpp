@@ -1,7 +1,7 @@
 #ifndef MAIN_HPP
 #define MAIN_HPP
 #define SENDER 0
-#define VEHICLE 1
+#define VEHICLE 0
 #define PIEZO 4
 #define LED 5
 #define INVOLTAGE A7
@@ -37,4 +37,5 @@
 #define BACK_RIGHT BACK | RIGHT
 
 #define EXPONENTIAL_FACTOR 0.45
+#define LP (1 - 0.45)
 #endif

@@ -1,7 +1,7 @@
 
 #ifndef COMMUNICATION_PROVIDER_HPP_
 #define COMMUNICATION_PROVIDER_HPP_
-#define PAYLOAD_LENGTH 24
+#define PAYLOAD_LENGTH 35
 
 enum
 {
@@ -49,5 +49,18 @@ struct SenderPayload {
 
 class CommunicationProvider
 {
+    public:
+    virtual int read() = 0;
+    virtual bool write(void *buf, uint8_t len) = 0;
+    uint8_t msgBuf[PAYLOAD_LENGTH];
+    uint8_t *getBuf() {
+        return msgBuf;
+    }
+    private:
+};
+
+
+class RemoteMock : public CommunicationProvider {
+    int read() override {}
 };
 #endif
