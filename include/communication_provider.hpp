@@ -40,27 +40,30 @@ struct ReceiverPayload
 };
 
 struct SenderPayload {
-    int8_t speeds[4];
-    float position1[3];
-    float position2[3];
-    float voltage;
+    int8_t speeds[4]; // speed, pitch, roll, yaw
+    float position1[3]; // x, y, z
+    float position2[3]; // rotation x, rotation y, rotation z
+    float voltage; // voltage level
 
 };
 
+// Communication provider class
 class CommunicationProvider
 {
     public:
     virtual int read() = 0;
     virtual bool write(void *buf, uint8_t len) = 0;
-    uint8_t msgBuf[PAYLOAD_LENGTH];
-    uint8_t *getBuf() {
+    const uint8_t *getBuf() {
         return msgBuf;
     }
-    private:
+    protected:
+    uint8_t msgBuf[PAYLOAD_LENGTH];
 };
 
 
+
+// Mock provider for testing without hardware
 class RemoteMock : public CommunicationProvider {
-    int read() override {}
+    int read() override { return 0;}
 };
 #endif
