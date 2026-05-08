@@ -8,7 +8,8 @@
 #include "pid.hpp"
 #include "vehicle.hpp"
 
-uint8_t payloadLength = 0;
+#define SERVOS 4
+
 uint8_t address[][6] = {"Send1", "Recv1"};
 // It is very helpful to think of an address as a path instead of as
 // an identifying device destination
@@ -24,9 +25,9 @@ long msg_b;
 #if SENDER == 0
 sensors_event_t am, g, temp;
 Adafruit_MPU6050 a;
-int servoPins[4] = {A0, A1, A2, A3};
-Servo servos[4];
-bool gyro = false;
+int servoPins[SERVOS] = {A0, A1, A2, A3};
+Servo servos[SERVOS];
+bool gyro = false; // gyro apply
 
 double pitchVal = 0;
 double rollVal = 0;
@@ -137,7 +138,7 @@ void setAlpha()
     app.log("Nan");
     alphaX = 0;
     alphaY = 0;
-    if (index == 18) {
+    if (index == 18) { // if we have 18 readings, reset gyro to try to fix it
       initGyro();
       index = 0;
     } else {
@@ -224,45 +225,7 @@ void printVoltage()
     Serial.print("\n");
   }
 }
-#endif
-#if VEHICLE == 1
-void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply) {
-  if (motorsApply) {
-    drive(p.speed * 0.8, p.roll * 0.45);
-  } else {
-    drive(0, 0);
-  }
-}
-#endif
-#endif
-
-void setup()
-{
-  vals1[0] = 4;
-  vals1[1] = 8;
-  vals1[2] = 16;
-  vals1[3] = 180;
-  app.initLog(9600);
-  // put your setup code here, to run once:
-  if (!radio.init())
-  {
-    app.log("Device is not responding");
-    app.ledError();
-  }
-  else
-  {
-    app.log("Nrf radio successfully connected");
-  }
-#if SENDER == 0
-  //app.initPiezo(PIEZO);
-  app.initVoltage(INVOLTAGE, 3, 8);
-  #if VEHICLE == 0
-  app.initLed(LED);
-  for (int i = 0; i < 4; i++)
-  {
-    pids[i] = PID(0.18, 0.0, 0.18, -4, 4);
-    filters[i] = Filter(0.18);
-  }
+void initAccelerometer() {
   for (int i = 0; i < 10; i++)
   {
     bool a1 = a.begin();
@@ -283,20 +246,58 @@ void setup()
     }
     delay(10);
   }
-  app.output(1000, 1300, 100, 0.04);
+}
+
+void initPIDS() {
+  for (int i = 0; i < 4; i++)
+  {
+    pids[i] = PID(0.18, 0.0, 0.18, -4, 4);
+    filters[i] = Filter(0.18);
+  }
+}
+#endif
+#if VEHICLE == 1
+void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply) {
+  if (motorsApply) {
+    drive(p.speed * 0.8, p.roll * 0.45);
+  } else {
+    drive(0, 0);
+  }
+}
+#endif
+#endif
+
+void setup()
+{
+  app.initLog(9600);
+  // put your setup code here, to run once:
+  if (!radio.init())
+  {
+    app.log("Device is not responding");
+    app.ledError();
+  }
+  else
+  {
+    app.log("Nrf radio successfully connected");
+  }
+#if SENDER == 0
+  #if VEHICLE == 0
+  app.initLed(LED);
+  app.initPiezo(PIEZO);
+  app.initVoltage(INVOLTAGE, 3, 8);
+  initPIDS();
+  initAccelerometer();
   initServos();
   setServos(1000);
-  //setMotors();
-  #endif
-  #if VEHICLE == 1
+  #else if VEHICLE == 1
   motor_1_setup(1);
   motor_2_setup(1);
   #endif
   pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
   radio.getRadio().openReadingPipe(1, address[0]);
   radio.getRadio().startListening();
-  delay(400);
   delay(100);
+  app.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on, also helps with gyro calibration
 #else
   app.log("Setting up radio for sender");
   Serial.setTimeout(10);
@@ -308,30 +309,29 @@ void setup()
 }
 void loop()
 {
-  int action = 1;
   bool gyroSetup = false;
 #if SENDER == 1
-  int8_t uartData[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  int8_t uartData[18] = {0};
   if (Serial) // read from uart
   {
     int s = Serial.readBytesUntil('\n', (char *)uartData, sizeof(uartData) - 1);
-    if (s < 1)
+    if (s < 1) // if we didn't get any data, do nothing (instead of applying old data or random data)
     {
       app.log("No action");
     }
-    else if (s >= 5 && uartData[0] == 'c')
+    else if (s >= 5 && uartData[0] == 'c') // we have a speed change command, it should be in the format c<speed0><speed1><speed2><speed3>\n, where speeds are between -127 and 127
     {
       memcpy(vals, uartData + 1, 4);
       app.log("Got speed change");
       msg_b = millis();
     }
-    else if (uartData[0] == 's')
+    else if (uartData[0] == 's') // we have a gyro setup command, it should be just s\n
     {
       app.log("Sending setup");
       gyroSetup = true;
     }
   }
-  if ((millis() - msg_b) > NO_MSG) {
+  if ((millis() - msg_b) > NO_MSG) { // if we haven't received a speed change command in a while, reset speeds to 0 to avoid failing
     vals[0] = 0;
     vals[1] = 0;
     vals[2] = 0;
@@ -353,6 +353,7 @@ void loop()
   {
     app.log("Voltage");
     /*motorsApply = false;*/
+    //app.noPackageAction();
   }
   setSpeeds(app.getPayload(), app.recentMessage(), gyroApply);
   delay(RECEIVER_SLEEP);
