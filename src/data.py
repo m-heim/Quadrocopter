@@ -1,11 +1,9 @@
 #!/usr/bin/python3
 
 import pygame
-import requests
-import json
 import time
+import sys
 import serial
-import atexit
 
 
 DEBUG = True
@@ -49,7 +47,11 @@ def joystick_setup() -> list[pygame.joystick.Joystick]:
     return joysticks
 
 def main():
-    with serial.Serial("COM3", 9600, timeout=10) as s:
+    if len(sys.argv) != 2:
+        print("Usage: python data.py <serial_port>")
+        sys.exit(1)
+
+    with serial.Serial(sys.argv[1], 9600, timeout=10) as s:
         joysticks = joystick_setup()
         print(f'Found {pygame.joystick.get_count()} joysticks on ports')
         while True:
