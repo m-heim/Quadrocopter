@@ -35,7 +35,7 @@ public:
     {
         return (millis() - msg_a) < NO_MSG;
     }
-    bool handle();
+    bool handle(SenderPayload &payload);
 
     bool handle2(int8_t *buf, bool gyroSetup);
 
@@ -129,6 +129,9 @@ public:
 #if DEBUG == 1
         if (Serial)
         {
+            while (!Serial.availableForWrite())
+            {
+            }
             Serial.println(msg);
         }
 #endif

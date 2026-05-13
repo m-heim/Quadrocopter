@@ -41,10 +41,9 @@ struct ReceiverPayload
 
 struct SenderPayload {
     int8_t speeds[4]; // speed, pitch, roll, yaw
-    float position1[3]; // x, y, z
-    float position2[3]; // rotation x, rotation y, rotation z
-    float voltage; // voltage level
-
+    int32_t position1[3]; // x, y, z
+    int8_t position2[3]; // rotation x, rotation y, rotation z
+    uint8_t voltage; // voltage level volage * 10
 };
 
 // Communication provider class
@@ -53,6 +52,8 @@ class CommunicationProvider
     public:
     virtual int read() = 0;
     virtual bool write(void *buf, uint8_t len) = 0;
+    virtual int enableReceive() = 0;
+    virtual int disableReceive() = 0;
     const uint8_t *getBuf() {
         return msgBuf;
     }

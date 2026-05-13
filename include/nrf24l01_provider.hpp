@@ -39,6 +39,16 @@ public:
         return this->radio;
     }
 
+    int enableReceive() override {
+        this->radio.startListening();
+        return 0;
+    }
+
+    int disableReceive() override {
+        this->radio.stopListening();
+        return 0;
+    }
+
 private:
     int get_payload_size() {
         return this->radio.getPayloadSize();

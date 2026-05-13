@@ -29,12 +29,12 @@ int servoPins[SERVOS] = {A0, A1, A2, A3};
 Servo servos[SERVOS];
 bool gyro = false; // gyro apply
 
-double pitchVal = 0;
-double rollVal = 0;
-double alphaX = 0;
-double alphaY = 0;
-double xGyro = 0;
-double yGyro = 0;
+float pitchVal = 0;
+float rollVal = 0;
+float alphaX = 0;
+float alphaY = 0;
+float xGyro = 0;
+float yGyro = 0;
 PID pids[4];
 Filter filters[4];
 uint64_t start = millis();
@@ -282,27 +282,35 @@ void setup()
   }
 #if SENDER == 0
   #if VEHICLE == 0
+  app.log("Initializing for receiver");
   app.initLed(LED);
   app.initPiezo(PIEZO);
   app.initVoltage(INVOLTAGE, 3, 8);
+  app.log("Initializing pid and gyro");
   initPIDS();
   initAccelerometer();
+  app.log("Initializing motors");
   initServos();
   setServos(1000);
-  #else if VEHICLE == 1
+  #endif
+  #if VEHICLE == 1
   motor_1_setup(1);
   motor_2_setup(1);
   #endif
+  app.log("Setting up radio for receiver");
   pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
   radio.getRadio().openReadingPipe(1, address[0]);
-  radio.getRadio().startListening();
+  radio.getRadio().openWritingPipe(address[1]);
+  radio.getRadio().stopListening();
+  app.log("Radio setup for receiver");
   delay(100);
-  app.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on, also helps with gyro calibration
+  app.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on
 #else
   app.log("Setting up radio for sender");
   Serial.setTimeout(10);
   pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
   radio.getRadio().openWritingPipe(address[0]);
+  radio.getRadio().openReadingPipe(1, address[1]);
   radio.getRadio().stopListening();
   app.log("Radio setup for sender");
 #endif
@@ -347,7 +355,12 @@ void loop()
     a.getEvent(&am, &g, &temp);
     gyroApply = true;
   }
-  bool pkg = app.handle();
+  SenderPayload senderPayload;
+  senderPayload.position2[0] = (int8_t) (alphaX / 180) * 127;
+  senderPayload.position2[1] = (int8_t) (alphaY / 180) * 127;
+  senderPayload.position2[2] = 0;
+  senderPayload.voltage = app.getVoltage();
+  bool pkg = app.handle(senderPayload);
   /*printVoltage();*/
   if (!app.verifyVoltage())
   {
@@ -356,6 +369,7 @@ void loop()
     //app.noPackageAction();
   }
   setSpeeds(app.getPayload(), app.recentMessage(), gyroApply);
+
   delay(RECEIVER_SLEEP);
 #endif
 }
