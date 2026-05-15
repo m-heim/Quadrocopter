@@ -17,7 +17,7 @@ public:
         {
             this->radio.setPALevel(RF24_PA_LOW);
             this->radio.setAutoAck(true);  // ensure auto-ack is enabled
-            this->radio.setRetries(5, 15); // small retry/backoff (adjust if needed)
+            this->radio.setRetries(5, 7); // small retry/backoff (adjust if needed)
             this->radio.setPayloadSize(PAYLOAD_LENGTH);
         }
         return r != 0;

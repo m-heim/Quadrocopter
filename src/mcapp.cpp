@@ -1,41 +1,30 @@
 #include "mcapp.hpp"
+#include "WString.h"
 
     bool MCApp::handle(SenderPayload &p)
     {
+        msg_n += 1;
         bool valid = false;
-        uint8_t buf[PAYLOAD_LENGTH];
-        buf[0] = STATUS_RECEIVER;
-        buf[1] = sizeof(p);
-        memcpy(buf + 2, &p, sizeof(p));
-        getRemote()->disableReceive();
-        bool report = remote->write((void *)&p, sizeof(p));
-        getRemote()->enableReceive();
-        if(report) {
-            log("Message was successfully transmitted");
-        }
-        else {
-            log("No ack from receiver");
-        }
         if (remote->read() > 0)
         { // is there a payload? get the pipe number that recieved it
             valid = true;
-            const uint8_t *buf = remote->getBuf();
+            const uint8_t *o = remote->getBuf();
             // setup gyro
-            if (buf[0] == GYRO_SETUP)
+            if (o[0] == GYRO_SETUP)
             {
                 log("Received gyro setup");
                 // setGravity();
             }
             // setup motor
-            else if (buf[0] == MOTOR_SETUP)
+            else if (o[0] == MOTOR_SETUP)
             {
                 log("Received motor setup");
             }
             // control message
-            else if (buf[0] == CONTROL)
+            else if (o[0] == CONTROL)
             {
                 log("Received payload");
-                memcpy(&payload, buf + 2, sizeof(payload));
+                memcpy(&payload, o + 2, sizeof(payload));
                 printPayload(payload);
                 msg_a = millis();
             }
@@ -47,7 +36,7 @@
         }
         else
         {
-            log("Radio not available");
+            log(F("Recv 0"));
         }
         if (!recentMessage())
         {
@@ -57,11 +46,27 @@
         else
         {
         }
+        if ((msg_n % 10) == 0) {
+            uint8_t buf[PAYLOAD_LENGTH];
+            buf[0] = STATUS_RECEIVER;
+            buf[1] = sizeof(p);
+            memcpy(buf + 2, &p, sizeof(p));
+            getRemote()->disableReceive();
+            bool report = remote->write(buf, sizeof(p) + 2);
+            getRemote()->enableReceive();
+            if(report) {
+                log(F("Send 1"));
+            }
+            else {
+                log(F("Send 0"));
+            }
+        }
         return valid;
     }
 
-bool MCApp::handle2(int8_t *buf, bool error, bool gyroSetup)
+bool MCApp::handle2(int8_t *buf, bool error, bool gyroSetup, SenderPayload *senderPayload)
     {
+        msg_n += 1;
         int payloadLength = 0;
         int action = 1;
         if (gyroSetup) {
@@ -111,23 +116,18 @@ bool MCApp::handle2(int8_t *buf, bool error, bool gyroSetup)
         }
         if (getRemote()->read() > 0)
         { // is there a payload? get the pipe number that recieved it
-            const uint8_t *buf = getRemote()->getBuf();
-            if (buf[0] == OK)
+            const uint8_t *o = getRemote()->getBuf();
+            if (o[0] == STATUS_RECEIVER)
             {
-                log("Received OK");
-            }
-            else if (buf[0] == ERROR)
-            {
-                log("Received ERROR");
-            }
-            else
-            {
-                log("Received unknown response");
+                log("Recv 1");
+                memcpy(senderPayload, o + 2, sizeof(*senderPayload));
+            } else {
+                log(F("Recv 2"));
             }
         }
         else
         {
-            log("No message");
+            log("Recv 0");
         }
         return report;
     }
