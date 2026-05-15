@@ -15,10 +15,9 @@ uint8_t address[][6] = {"Send1", "Recv1"};
 // an identifying device destination
 int radioNumber = SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
 NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
-MCApp app = MCApp(&radio);
+UartIOHandler uartIOHandler = UartIOHandler();
+MCApp app = MCApp(&radio, uartIOHandler);
 SenderPayload payload2 = {0};
-int freq = FREQ_DEFAULT;
-double vals1[4];
 int8_t vals[4];
 long msg_b;
 
@@ -298,7 +297,6 @@ void setup()
   motor_2_setup(1);
   #endif
   app.log("Setting up radio for receiver");
-  pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
   radio.getRadio().openReadingPipe(1, address[0]);
   radio.getRadio().openWritingPipe(address[1]);
   radio.getRadio().stopListening();
@@ -307,8 +305,7 @@ void setup()
   app.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on
 #else
   app.log("Setting up radio for sender");
-  Serial.setTimeout(10);
-  pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
+  Serial.setTimeout(100); // 100 ms timeout for serial read, adjust if needed
   radio.getRadio().openWritingPipe(address[0]);
   radio.getRadio().openReadingPipe(1, address[1]);
   radio.getRadio().stopListening();
@@ -319,33 +316,36 @@ void loop()
 {
   bool gyroSetup = false;
 #if SENDER == 1
-  int8_t uartData[18] = {0};
+  int8_t uartData[35] = {0};
   if (Serial) // read from uart
   {
-    int s = Serial.readBytesUntil('\n', (char *)uartData, sizeof(uartData) - 1);
-    if (s < 1) // if we didn't get any data, do nothing (instead of applying old data or random data)
+    String s = Serial.readStringUntil('\n');
+    if (s.length() < 1) // if we didn't get any data, do nothing (instead of applying old data or random data)
     {
       app.log("No action");
     }
-    else if (s >= 5 && uartData[0] == 'c') // we have a speed change command, it should be in the format c<speed0><speed1><speed2><speed3>\n, where speeds are between -127 and 127
+    else if (s.length() >= (1 + 4 + 3) && s.charAt(0) == 'c') // we have a speed change command, it should be in the format c<speed0><speed1><speed2><speed3>\n, where speeds are between -127 and 127
     {
-      memcpy(vals, uartData + 1, 4);
+      int index = 1;
+      for(int i = 0; i < 4; i++) {
+        String numStr = s.substring(index, s.indexOf(',', index));
+        if (numStr.length() >= 1) {
+          vals[i] = (int8_t) numStr.toInt();
+        } else {
+          vals[i] = 0;
+        }
+        index += numStr.length() + 1;
+      }
       app.log("Got speed change");
       msg_b = millis();
     }
-    else if (uartData[0] == 's') // we have a gyro setup command, it should be just s\n
+    else if (s.charAt(0) == 's') // we have a gyro setup command, it should be just s\n
     {
       app.log("Sending setup");
       gyroSetup = true;
     }
   }
-  if ((millis() - msg_b) > NO_MSG) { // if we haven't received a speed change command in a while, reset speeds to 0 to avoid failing
-    vals[0] = 0;
-    vals[1] = 0;
-    vals[2] = 0;
-    vals[3] = 0;
-  }
-  app.handle2(vals, gyroSetup);
+  app.handle2(vals, (millis() - msg_b) > NO_MSG, gyroSetup);
   delay(SENDER_SLEEP);
 #else
   bool gyroApply = false;

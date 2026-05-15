@@ -60,7 +60,7 @@
         return valid;
     }
 
-bool MCApp::handle2(int8_t *buf, bool gyroSetup)
+bool MCApp::handle2(int8_t *buf, bool error, bool gyroSetup)
     {
         int payloadLength = 0;
         int action = 1;
@@ -79,6 +79,12 @@ bool MCApp::handle2(int8_t *buf, bool gyroSetup)
             payload.pitch = buf[1];
             payload.yaw = buf[2];
             payload.roll = buf[3];
+            if (error) {
+                payload.speed = 0;
+                payload.pitch = 0;
+                payload.yaw = 0;
+                payload.roll = 0;
+            }
             memcpy(msgBuf + 2, &payload, sizeof(payload));
             log("Sending");
         }
@@ -100,6 +106,7 @@ bool MCApp::handle2(int8_t *buf, bool gyroSetup)
         }
         if (!recentMessage())
         {
+            noPackageAction();
             log("No recent message");
         }
         if (getRemote()->read() > 0)

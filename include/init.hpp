@@ -1,6 +1,6 @@
 #ifndef MAIN_HPP
 #define MAIN_HPP
-#define SENDER 0
+#define SENDER 1
 #define VEHICLE 0
 #define PIEZO 4
 #define LED 5

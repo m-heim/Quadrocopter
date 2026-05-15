@@ -7,15 +7,27 @@
 #include "Arduino.h"
 #include "communication_provider.hpp"
 
+class IOHandler {
+    public:
+    virtual void send(const char *msg, int len) = 0;
+};
+
+class UartIOHandler : public IOHandler {
+    public:
+    void send(const char *msg, int len) override {
+        Serial.write(msg, len);
+    }
+    int recv(char *buf, int len) {
+        return Serial.readBytes(buf, len);
+    }
+};
+
 class MCApp
 {
 public:
-    MCApp() : remote(nullptr)
+    MCApp(CommunicationProvider *remote, IOHandler &iohandler) : remote(remote), iohandler(iohandler)
     {
         pinMode(LED_BUILTIN, OUTPUT);
-    }
-    MCApp(CommunicationProvider *remote) : remote(remote)
-    {
     }
     void output(int start, int stop, int step, float seconds)
     {
@@ -37,7 +49,7 @@ public:
     }
     bool handle(SenderPayload &payload);
 
-    bool handle2(int8_t *buf, bool gyroSetup);
+    bool handle2(int8_t *buf, bool error, bool gyroSetup);
 
     void noPackageAction()
     {
@@ -165,6 +177,7 @@ public:
         ledState = !ledState;
     }
     CommunicationProvider *remote;
+    IOHandler &iohandler;
 
     ReceiverPayload &getPayload()
     {

@@ -20,7 +20,7 @@ def data_send(s, speed: float, steer: float,  yaw: float, roll: float) -> None:
     #print("Sending data" +  str(speed) + str(steer))
     #print(int.to_bytes(int(speed * 127), length=1, signed=True))
     #print(int.to_bytes(int(steer * 127), length=1, signed=True))
-    data = b'c' + int.to_bytes(int(speed * 127), length=1, signed=True) + int.to_bytes(int(steer * 127), length=1, signed=True) + int.to_bytes(int(yaw * 127), length=1, signed=True) + int.to_bytes(int(roll * 127), length=1, signed=True) + b'\n'
+    data = b'c' + str(int(speed * 127)).encode('utf-8') + b',' + str(int(steer * 127)).encode('utf-8') + b',' + str(int(yaw * 127)).encode('utf-8') + b',' + str(int(roll * 127)).encode('utf-8') + b'\n'
     s.write(data)
     #print("Data" + str(list(data)))
 

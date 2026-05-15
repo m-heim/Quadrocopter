@@ -11,6 +11,7 @@ public:
     }
     bool init()
     {
+        pinMode(10, OUTPUT); // set pin 10 for output, necessary for spi
         int r = this->radio.begin();
         if (r)
         {
