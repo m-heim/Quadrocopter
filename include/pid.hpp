@@ -30,11 +30,11 @@ public:
     }
 
 private:
-    double integralRange1;
-    double integralRange2;
     double kp;
     double ki;
     double kd;
+    double integralRange1;
+    double integralRange2;
     bool useIntegralRange = false;
     double prev_err = 0;
     double val = 0;
