@@ -6,10 +6,10 @@ class PID
 {
 public:
     PID() {}
-    PID(double kp, double ki, double kd) : kp(kp), ki(ki), kd(kd) {}
-    PID(double kp, double ki, double kd, double integralRange1, double integralRange2) : kp(kp), ki(ki), kd(kd), integralRange1(integralRange1), integralRange2(integralRange2), useIntegralRange(true) {}
+    PID(float kp, float ki, float kd) : kp(kp), ki(ki), kd(kd) {}
+    PID(float kp, float ki, float kd, float integralRange1, float integralRange2) : kp(kp), ki(ki), kd(kd), integralRange1(integralRange1), integralRange2(integralRange2), useIntegralRange(true) {}
     ~PID() {}
-    double update(double val, double set, double step)
+    float update(float val, float set, float step)
     {
         error = val - set;
         error_derivative = error - prev_err;
@@ -20,7 +20,7 @@ public:
         prev_err = error;
         return getValue();
     }
-    double getValue()
+    float getValue()
     {
         val = 0;
         val += error * kp;
@@ -30,24 +30,24 @@ public:
     }
 
 private:
-    double kp;
-    double ki;
-    double kd;
-    double integralRange1;
-    double integralRange2;
+    float integralRange1;
+    float integralRange2;
+    float kp;
+    float ki;
+    float kd;
     bool useIntegralRange = false;
-    double prev_err = 0;
-    double val = 0;
-    double error = 0;
-    double error_sum = 0;
-    double error_derivative = 0;
+    float prev_err = 0;
+    float val = 0;
+    float error = 0;
+    float error_sum = 0;
+    float error_derivative = 0;
 };
 
 class Filter
 {
 public:
     Filter() {}
-    Filter(double factor) : factor(factor)
+    Filter(float factor) : factor(factor)
     {
         if (factor < 0 || factor > 1)
         {
@@ -55,20 +55,20 @@ public:
         }
     }
     ~Filter() {}
-    double update(double value)
+    float update(float value)
     {
         val = (factor * value) + ((1 - factor) * val);
         return getValue();
     }
-    double getValue() {
+    float getValue() {
         return val;
     }
 
 private:
-    double factor = 0;
-    double val = 0;
+    float factor = 0;
+    float val = 0;
 };
-double inRange(double val, double r1, double r2)
+float inRange(float val, float r1, float r2)
 {
     if (val < r1)
     {

@@ -9,11 +9,12 @@
 #include "vehicle.hpp"
 
 #define SERVOS 4
+#define PIDS 2
 
 uint8_t address[][6] = {"Send1", "Recv1"};
 // It is very helpful to think of an address as a path instead of as
 // an identifying device destination
-int radioNumber = SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+uint8_t radioNumber = SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
 NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
 UartIOHandler uartIOHandler = UartIOHandler();
 MCApp app = MCApp(&radio, uartIOHandler);
@@ -34,11 +35,11 @@ float alphaX = 0;
 float alphaY = 0;
 float xGyro = 0;
 float yGyro = 0;
-PID pids[4];
-Filter filters[4];
+PID pids[PIDS];
+Filter filters[PIDS];
 uint64_t start = millis();
 // what angle we are by default
-double gravity[2];
+float gravity[2];
 int index = 0;
 #if VEHICLE == 0
 void initServos()
@@ -108,7 +109,7 @@ void initGyro() {
     bool a1 = a.begin();
     if (a1)
     {
-      app.log("Accelerometer is working");
+      app.log(F("G 1"));
       a.setGyroRange(MPU6050_RANGE_500_DEG);
       a.setFilterBandwidth(MPU6050_BAND_184_HZ);
       a.setSampleRateDivisor(7);
@@ -117,7 +118,7 @@ void initGyro() {
       //setGravity();
     }
     else {
-      app.log("Accelerometer is not working");
+      app.log(F("G 0"));
     }
 }
 
@@ -162,10 +163,10 @@ void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
 {
   float speeds[4];
   setValues();
-  pitchVal = filters[1].update(pids[1].update(alphaY, app.getPayload().pitch / 4, 1));
-  rollVal = filters[2].update(pids[2].update(alphaX, app.getPayload().roll / 4, 1));
-  double pp = inRange(pitchVal, -16, 16); // - (yGyro / 4);
-  double rr = inRange(rollVal, -16, 16);  // + (xGyro / 4);
+  pitchVal = filters[0].update(pids[0].update(alphaY, app.getPayload().pitch / 4, 1));
+  rollVal = filters[1].update(pids[1].update(alphaX, app.getPayload().roll / 4, 1));
+  float pp = inRange(pitchVal, -16, 16); // - (yGyro / 4);
+  float rr = inRange(rollVal, -16, 16);  // + (xGyro / 4);
   for (int i = 0; i < 4; i++)
   {
     speeds[i] = p.speed;
@@ -209,8 +210,8 @@ void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
     }
     servos[i].writeMicroseconds(v);
   }
-  char buf[189];
-  sprintf(buf, "%d %d %d %d %d %d %d %d %d %d", (int)(alphaX * 1000), (int)(alphaY * 1000), (int)(gravity[0] * 1000), (int)(gravity[1] * 1000), (int)(pitchVal * 1000), (int)(rollVal * 1000), (int)speeds[0], (int)speeds[1], (int)speeds[2], (int)speeds[3]);
+  char buf[40];
+  snprintf(buf, 40, "%d %d %d %d %d %d %d %d %d %d", (int)(alphaX * 1000), (int)(alphaY * 1000), (int)(gravity[0] * 1000), (int)(gravity[1] * 1000), (int)(pitchVal * 1000), (int)(rollVal * 1000), (int)speeds[0], (int)speeds[1], (int)speeds[2], (int)speeds[3]);
   app.log(buf);
 }
 
@@ -227,10 +228,15 @@ void printVoltage()
 void initAccelerometer() {
   for (int i = 0; i < 10; i++)
   {
+    app.log("I1");
     bool a1 = a.begin();
+    delay(100);
+    app.log("I1");
     if (a1)
     {
-      app.log("Accelerometer is working");
+      delay(10);
+      app.log("OM 1");
+      delay(10);
       a.setGyroRange(MPU6050_RANGE_500_DEG);
       a.setFilterBandwidth(MPU6050_BAND_5_HZ);
       a.setSampleRateDivisor(7);
@@ -241,14 +247,14 @@ void initAccelerometer() {
     }
     if (i == 9)
     {
-      app.log("Accelerometer is not working");
+      app.log("OM 0");
     }
     delay(10);
   }
 }
 
 void initPIDS() {
-  for (int i = 0; i < 4; i++)
+  for (int i = 0; i < PIDS; i++)
   {
     pids[i] = PID(0.18, 0.0, 0.18, -4, 4);
     filters[i] = Filter(0.18);
@@ -268,27 +274,27 @@ void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply) {
 
 void setup()
 {
-  app.initLog(9600);
+  app.initLog(115200);
   // put your setup code here, to run once:
   if (!radio.init())
   {
-    app.log("Device is not responding");
+    app.log("RF24 0");
     app.ledError();
   }
   else
   {
-    app.log("Nrf radio successfully connected");
+    app.log("RF24 1");
   }
 #if SENDER == 0
   #if VEHICLE == 0
-  app.log("Initializing for receiver");
+  app.log("1");
   app.initLed(LED);
   app.initPiezo(PIEZO);
   app.initVoltage(INVOLTAGE, 3, 8);
-  app.log("Initializing pid and gyro");
+  app.log("PID,GYRO");
   initPIDS();
   initAccelerometer();
-  app.log("Initializing motors");
+  app.log("MOTORS");
   initServos();
   setServos(1000);
   #endif
@@ -304,6 +310,7 @@ void setup()
   delay(100);
   app.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on
 #else
+  msg_b = millis() - NO_MSG - 1; // set last message time to a while ago so that it doesn't fail if we don't get a message right away
   app.log("Setting up radio for sender");
   Serial.setTimeout(100); // 100 ms timeout for serial read, adjust if needed
   radio.getRadio().openWritingPipe(address[0]);
@@ -312,6 +319,7 @@ void setup()
   app.log("Radio setup for sender");
 #endif
 }
+SenderPayload senderPayload;
 void loop()
 {
   bool gyroSetup = false;
@@ -345,7 +353,10 @@ void loop()
       gyroSetup = true;
     }
   }
-  app.handle2(vals, (millis() - msg_b) > NO_MSG, gyroSetup);
+  app.handle2(vals, (millis() - msg_b) > NO_MSG, gyroSetup, &senderPayload);
+  char buf[35];
+  sprintf(buf, "%d %d", (int) senderPayload.position2[0] / 127 * 180, (int) senderPayload.position2[1] / 127 * 180);
+  app.log(buf);
   delay(SENDER_SLEEP);
 #else
   bool gyroApply = false;

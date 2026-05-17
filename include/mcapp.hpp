@@ -49,7 +49,7 @@ public:
     }
     bool handle(SenderPayload &payload);
 
-    bool handle2(int8_t *buf, bool error, bool gyroSetup);
+    bool handle2(int8_t *buf, bool error, bool gyroSetup, SenderPayload *senderPayload);
 
     void noPackageAction()
     {
@@ -141,9 +141,15 @@ public:
 #if DEBUG == 1
         if (Serial)
         {
-            while (!Serial.availableForWrite())
-            {
-            }
+            Serial.println(msg);
+        }
+#endif
+    }
+    void log(__FlashStringHelper *msg)
+    {
+#if DEBUG == 1
+        if (Serial)
+        {
             Serial.println(msg);
         }
 #endif
@@ -196,5 +202,6 @@ private:
     bool isConnected = false; // connection status
     ReceiverPayload payload = {0, 0, 0, 0}; // current payload
     uint8_t msgBuf[PAYLOAD_LENGTH];
+    uint32_t msg_n = 0;
 };
 #endif
