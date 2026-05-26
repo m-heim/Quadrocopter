@@ -58,13 +58,15 @@ void setup()
 void handleSender()
 {
   QuadrocopterMessage p;
-  if (uartInputHandler.handle(&app.messageHandler, app.messages))
+  int msgs = uartInputHandler.handle(&app.messageHandler, app.messages);
+  if (msgs > 0)
   {
     app.log(F("Sender.Uart.Received 1"));
-    for (int i = 0; i < MESSAGES; i++)
+    for (int i = 0; i < msgs; i++)
     {
       if (app.messages[i].getMsg() == CONTROL)
       {
+        app.log(F("Sender.Control 1"));
         uint8_t *data = app.messages[i].getData();
         memcpy(p.speeds, data, 4);
       }
@@ -86,7 +88,6 @@ void handleSender()
   {
     app.log(F("Sender.Uart.Received 0"));
   }
-  delay(10);
   app.handle2(p, uartInputHandler.isRecent());
 }
 void loop()

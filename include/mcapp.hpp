@@ -7,236 +7,223 @@
 #include "init.hpp"
 #include "utils.hpp"
 
-class IOHandler
-{
-public:
-  virtual void send(const char *msg, int len) = 0;
-};
-
-class UartIOHandler : public IOHandler
-{
-public:
-  void send(const char *msg, int len) override
-  {
-    Serial.write(msg, len);
-  }
-  int recv(char *buf, int len)
-  {
-    return Serial.readBytes(buf, len);
-  }
-};
-
 typedef struct
 {
-  int8_t speeds[4];
-  uint8_t funs[4]; // for future use, can be used for extra features or to send
-                   // more data without changing the structure of the message
-  bool gyroSetup;
-  bool hover;
+    int8_t speeds[4];
+    uint8_t funs[4]; // for future use, can be used for extra features or to send
+                     // more data without changing the structure of the message
+    bool gyroSetup;
+    bool hover;
 } QuadrocopterMessage;
 
 typedef struct
 {
-  uint8_t speeds[4];
-  float orientation[3]; // x, y, z or other data depending on the application
-  float position[3];    // x, y, z or other data depending on the application
-  float voltage;
+    uint8_t speeds[4];
+    float orientation[3]; // roll, pitch, yaw or other data depending on the application
+    float position[3];    // x, y, z or other data depending on the application
+    float voltage;
 } SenderPayload;
 
 class InputHandler
 {
-  virtual bool handle(MessageHandler *messageHandler, Message *messages) = 0;
+    virtual bool handle(MessageHandler *messageHandler, Message *messages) = 0;
 };
 class UartInputHandler : public InputHandler
 {
 public:
-  UartInputHandler()
-  {
-    if (Serial)
+    UartInputHandler()
     {
-      Serial.begin(115200);
-      Serial.setTimeout(10);
+        if (Serial)
+        {
+            Serial.begin(115200);
+            Serial.setTimeout(10);
+        }
     }
-  }
-  bool handle(MessageHandler *messageHandler, Message *messages) override
-  {
-    if (!Serial)
+    bool handle(MessageHandler *messageHandler, Message *messages) override
     {
-      return false;
+        if (!Serial)
+        {
+            return false;
+        }
+        String s = Serial.readStringUntil('\0');
+        Serial.println("Received: " + s);
+        if (s.length() < 1) // if we didn't get any data, do nothing (instead of
+                            // applying old data or random data)
+        {
+            return false;
+        }
+        uint8_t buf[PAYLOAD_LENGTH];
+        for (int i = 0; (i * 2) < s.length() && i < sizeof(buf); i += 1)
+        {
+            buf[i] = (s.charAt(i * 2) - '0') << 4 | (s.charAt((i * 2) + 1) - '0');
+        }
+        if (buf[0] == PACKAGE && messageHandler->parsePackage(buf, messages, MESSAGES) > 0)
+        {
+            timer.start();
+            return true;
+        }
+        return false;
     }
-    String s = Serial.readStringUntil('\0');
-    if (s.length() < 1) // if we didn't get any data, do nothing (instead of
-                        // applying old data or random data)
-    {
-      return false;
-    }
-    uint8_t buf[PAYLOAD_LENGTH];
-    for (int i = 0; (i * 2) < s.length() && i < sizeof(buf); i += 1)
-    {
-      buf[i] = (s.charAt(i * 2) - '0') << 4 | (s.charAt((i * 2) + 1) - '0');
-    }
-    return buf[0] == PACKAGE && messageHandler->parsePackage(buf, messages, MESSAGES) > 0;
-  }
-  bool isRecent() { return !timer.isExpired(); }
+    bool isRecent() { return !timer.isExpired(); }
 
 private:
-  ArduinoTimer timer = ArduinoTimer(SENDER_INPUT_NO_MSG);
+    ArduinoTimer timer = ArduinoTimer(SENDER_INPUT_NO_MSG);
 };
 
 class MCApp
 {
 public:
-  MCApp(CommunicationProvider *remote) : remote(remote)
-  {
-    pinMode(LED_BUILTIN, OUTPUT);
-  }
-  void output(int start, int stop, int step, float seconds)
-  {
-    int s = (int)((seconds / 1000));
-    for (int i = start; i <= stop; i += step)
+    MCApp(CommunicationProvider *remote) : remote(remote)
     {
-      buzz(i, s);
-      delay(s);
+        pinMode(LED_BUILTIN, OUTPUT);
     }
-  }
-  CommunicationProvider *getRemote() { return this->remote; }
+    void output(int start, int stop, int step, float seconds)
+    {
+        int s = (int)((seconds / 1000));
+        for (int i = start; i <= stop; i += step)
+        {
+            buzz(i, s);
+            delay(s);
+        }
+    }
+    CommunicationProvider *getRemote() { return this->remote; }
 
-  bool recentMessage() { return !timer.isExpired(); }
-  int handle(SenderPayload &payload);
+    bool recentMessage() { return !timer.isExpired(); }
+    int handle(SenderPayload &payload);
 
-  bool handle2(const QuadrocopterMessage &p, bool valid);
+    bool handle2(const QuadrocopterMessage &p, bool valid);
 
-  void noPackageAction()
-  {
-    log("No package");
-    setLed(1);
-    buzz(freq, 10);
-    freq += 400;
-    if (freq > 4000)
+    void noPackageAction()
     {
-      freq = FREQ_BASE;
+        log("No package");
+        setLed(1);
+        buzz(freq, 10);
+        freq += 400;
+        if (freq > 4000)
+        {
+            freq = FREQ_BASE;
+        }
     }
-  }
-  int getVersion() { return MCAPP_VERSION; }
-  float getVoltage()
-  {
-    if (voltagePin == -1)
+    int getVersion() { return MCAPP_VERSION; }
+    float getVoltage()
     {
-      return 0;
+        if (voltagePin == -1)
+        {
+            return 0;
+        }
+        else
+        {
+            return (analogRead(voltagePin) / 1024) * voltageFactor;
+        }
     }
-    else
+    bool verifyVoltage()
     {
-      return (analogRead(voltagePin) / 1024) * voltageFactor;
+        return (voltagePin == NO_PIN) || (getVoltage() > voltage);
     }
-  }
-  bool verifyVoltage()
-  {
-    return (voltagePin == NO_PIN) || (getVoltage() > voltage);
-  }
-  void initPiezo(int pin)
-  {
-    pinMode(pin, OUTPUT);
-    piezoPin = pin;
-  }
-  void initVoltage(int pin, float factor, float v)
-  {
-    pinMode(pin, INPUT);
-    voltagePin = pin;
-    voltageFactor = factor;
-    voltage = v;
-  }
-  // buzz if possible
-  void buzz(int freq, int dur)
-  {
-    if (piezoPin == NO_PIN)
+    void initPiezo(int pin)
     {
-      return;
+        pinMode(pin, OUTPUT);
+        piezoPin = pin;
     }
-    tone(piezoPin, freq, dur);
-  }
-  // infinite loop led error
-  void ledError()
-  {
-    while (1)
+    void initVoltage(int pin, float factor, float v)
     {
-      digitalWrite(LED_BUILTIN, HIGH);
-      delay(1000);
-      digitalWrite(LED_BUILTIN, LOW);
-      delay(1000);
+        pinMode(pin, INPUT);
+        voltagePin = pin;
+        voltageFactor = factor;
+        voltage = v;
     }
-  }
-  // init logger
-  void initLog(long baud)
-  {
+    // buzz if possible
+    void buzz(int freq, int dur)
+    {
+        if (piezoPin == NO_PIN)
+        {
+            return;
+        }
+        tone(piezoPin, freq, dur);
+    }
+    // infinite loop led error
+    void ledError()
+    {
+        while (1)
+        {
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(1000);
+            digitalWrite(LED_BUILTIN, LOW);
+            delay(1000);
+        }
+    }
+    // init logger
+    void initLog(long baud)
+    {
 #if DEBUG == 1
-    if (Serial)
-    {
-      Serial.begin(baud);
-      Serial.println("Serial init");
-    }
+        if (Serial)
+        {
+            Serial.begin(baud);
+            Serial.println("Serial init");
+        }
 #endif
-  }
-  void log(const char *msg)
-  {
+    }
+    void log(const char *msg)
+    {
 #if DEBUG == 1
-    if (Serial)
-    {
-      Serial.println(msg);
-    }
+        if (Serial)
+        {
+            Serial.println(msg);
+        }
 #endif
-  }
-  void log(const __FlashStringHelper *msg)
-  {
+    }
+    void log(const __FlashStringHelper *msg)
+    {
 #if DEBUG == 1
-    if (Serial)
-    {
-      Serial.println(msg);
-    }
+        if (Serial)
+        {
+            Serial.println(msg);
+        }
 #endif
-  }
-  void initLed(int pin)
-  {
-    pinMode(pin, OUTPUT);
-    this->ledPin = pin;
-  }
-  void infinite()
-  {
-    while (1)
-    {
     }
-  }
-  void setLed(int val)
-  {
-    if (this->ledPin == NO_PIN)
+    void initLed(int pin)
     {
-      return;
+        pinMode(pin, OUTPUT);
+        this->ledPin = pin;
     }
-    else
+    void infinite()
     {
-      digitalWrite(ledPin, val);
+        while (1)
+        {
+        }
     }
-  }
-  // toggle led state and set
-  void ledToggle()
-  {
-    this->setLed(ledState);
-    ledState = !ledState;
-  }
-  CommunicationProvider *remote;
-  MessageHandler messageHandler;
-  Message messages[MESSAGES];
+    void setLed(int val)
+    {
+        if (this->ledPin == NO_PIN)
+        {
+            return;
+        }
+        else
+        {
+            digitalWrite(ledPin, val);
+        }
+    }
+    // toggle led state and set
+    void ledToggle()
+    {
+        this->setLed(ledState);
+        ledState = !ledState;
+    }
+    CommunicationProvider *remote;
+    MessageHandler messageHandler;
+    Message messages[MESSAGES];
 
 private:
-  int voltagePin = NO_PIN;
-  int piezoPin = NO_PIN;
-  int ledPin = NO_PIN;
-  float voltageFactor = 1.0;
-  float voltage;
-  bool ledState = false;
-  int freq = FREQ_BASE;
-  bool isConnected = false; // connection status
-  uint8_t msgBuf[PAYLOAD_LENGTH];
-  ArduinoTimer timer = ArduinoTimer(NO_MSG);
-  int msg_n = 0; // message counter, used for logging and other purposes
+    int voltagePin = NO_PIN;
+    int piezoPin = NO_PIN;
+    int ledPin = NO_PIN;
+    float voltageFactor = 1.0;
+    float voltage;
+    bool ledState = false;
+    int freq = FREQ_BASE;
+    bool isConnected = false; // connection status
+    uint8_t msgBuf[PAYLOAD_LENGTH];
+    ArduinoTimer timer = ArduinoTimer(NO_MSG);
+    int msg_n = 0; // message counter, used for logging and other purposes
 };
 #endif

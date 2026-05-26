@@ -20,7 +20,8 @@ def data_send(s, speed: float, steer: float,  yaw: float, roll: float) -> None:
     #print("Sending data" +  str(speed) + str(steer))
     #print(int.to_bytes(int(speed * 127), length=1, signed=True))
     #print(int.to_bytes(int(steer * 127), length=1, signed=True))
-    data = b'\x06' + str(hex(int(speed * 127))).encode('utf-8') + b',' + str(hex(int(steer * 127))).encode('utf-8') + b',' + str(hex(int(yaw * 127))).encode('utf-8') + b',' + str(hex(int(roll * 127))).encode('utf-8') + b'\0'
+    data = (hex(0x04)[2:].rjust(2, '0') + hex(0x06)[2:].rjust(2, '0') + hex(0x06)[2:].rjust(2, '0') + hex(0x04)[2:].rjust(2, '0') + hex(int(speed * 127))[2:].rjust(2, '0') + hex(int(steer * 127))[2:].rjust(2, '0') + hex(int(yaw * 127))[2:].rjust(2, '0') + hex(int(roll * 127))[2:].rjust(2, '0') + '\0').encode('utf-8')
+    print("Data: " + str(data))
     s.write(data)
     #print("Data" + str(list(data)))
 
