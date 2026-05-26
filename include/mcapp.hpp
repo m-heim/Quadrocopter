@@ -70,10 +70,40 @@ private:
     ArduinoTimer timer = ArduinoTimer(SENDER_INPUT_NO_MSG);
 };
 
+class Logger
+{
+public:
+    Logger(bool enabled) : enabled(enabled) {}
+    virtual void log(const char *msg) = 0;
+
+protected:
+    bool enabled;
+};
+
+class ArduinoLogger : public Logger
+{
+public:
+    ArduinoLogger(bool enabled, int baud) : Logger(enabled)
+    {
+        if (enabled && Serial)
+        {
+            Serial.begin(baud);
+            Serial.println("ArduinoLogger.Init 1");
+        }
+    }
+    void log(const char *msg) override
+    {
+        if (enabled && Serial)
+        {
+            Serial.println(msg);
+        }
+    }
+};
+
 class MCApp
 {
 public:
-    MCApp(CommunicationProvider *remote) : remote(remote)
+    MCApp(CommunicationProvider *remote, Logger *logger) : remote(remote), logger(logger)
     {
         pinMode(LED_BUILTIN, OUTPUT);
     }
@@ -95,7 +125,7 @@ public:
 
     void noPackageAction()
     {
-        log("No package");
+        logger->log("No package");
         setLed(1);
         buzz(freq, 10);
         freq += 400;
@@ -152,35 +182,6 @@ public:
             delay(1000);
         }
     }
-    // init logger
-    void initLog(long baud)
-    {
-#if DEBUG == 1
-        if (Serial)
-        {
-            Serial.begin(baud);
-            Serial.println("Serial init");
-        }
-#endif
-    }
-    void log(const char *msg)
-    {
-#if DEBUG == 1
-        if (Serial)
-        {
-            Serial.println(msg);
-        }
-#endif
-    }
-    void log(const __FlashStringHelper *msg)
-    {
-#if DEBUG == 1
-        if (Serial)
-        {
-            Serial.println(msg);
-        }
-#endif
-    }
     void initLed(int pin)
     {
         pinMode(pin, OUTPUT);
@@ -210,6 +211,7 @@ public:
         ledState = !ledState;
     }
     CommunicationProvider *remote;
+    Logger *logger;
     MessageHandler messageHandler;
     Message messages[MESSAGES];
 

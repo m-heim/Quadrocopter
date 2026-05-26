@@ -21,7 +21,8 @@
 uint8_t radioNumber =
     SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
 NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
-MCApp app = MCApp(&radio);
+ArduinoLogger logger(DEBUG, BAUD);
+MCApp app = MCApp(&radio, &logger);
 UartInputHandler uartInputHandler{};
 
 void startupSender()
@@ -33,18 +34,17 @@ void startupSender()
 
 void setup()
 {
-  app.initLog(115200);
-  app.log(F("Init"));
+  app.logger->log("Init");
   delay(100);
   // put your setup code here, to run once:
   if (!radio.init())
   {
-    app.log(F("Init.RF24 0"));
+    app.logger->log("Init.RF24 0");
     app.ledError();
   }
   else
   {
-    app.log(F("Init.RF24 1"));
+    app.logger->log("Init.RF24 1");
   }
 #if SENDER == 0
   startup();
@@ -52,7 +52,7 @@ void setup()
 #if SENDER == 1
   startupSender();
 #endif
-  app.log(F("Init 1"));
+  app.logger->log("Init 1");
 }
 
 void handleSender()
@@ -61,12 +61,12 @@ void handleSender()
   int msgs = uartInputHandler.handle(&app.messageHandler, app.messages);
   if (msgs > 0)
   {
-    app.log(F("Sender.Uart.Received 1"));
+    app.logger->log("Sender.Uart.Received 1");
     for (int i = 0; i < msgs; i++)
     {
       if (app.messages[i].getMsg() == CONTROL)
       {
-        app.log(F("Sender.Control 1"));
+        app.logger->log("Sender.Control 1");
         uint8_t *data = app.messages[i].getData();
         memcpy(p.speeds, data, 4);
       }
@@ -80,13 +80,13 @@ void handleSender()
       }
       else
       {
-        app.log(F("Sender.Uart.Received Err"));
+        app.logger->log("Sender.Uart.Received Err");
       }
     }
   }
   else
   {
-    app.log(F("Sender.Uart.Received 0"));
+    app.logger->log("Sender.Uart.Received 0");
   }
   app.handle2(p, uartInputHandler.isRecent());
 }
@@ -125,7 +125,7 @@ void loop()
   setSpeeds(speedBuf, app.recentMessage(), gyroApply);
   if (!app.verifyVoltage())
   {
-    app.log(F("Receiver.LowVoltage 1"));
+    app.logger->log("Receiver.LowVoltage 1");
   }
 
   delay(RECEIVER_SLEEP);
