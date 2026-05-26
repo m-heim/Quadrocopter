@@ -35,6 +35,7 @@ public:
     bool write(void *buf, uint8_t len) override {
         return this->radio.write(buf, len);
     }
+
     RF24 &getRadio()
     {
         return this->radio;
@@ -47,6 +48,17 @@ public:
 
     int disableReceive() override {
         this->radio.stopListening();
+        return 0;
+    }
+
+    int setEndpoint(const uint8_t *address) override {
+        this->radio.openWritingPipe(address);
+        return 0;
+    }
+
+    int setRead(const uint8_t *address) override {
+        this->radio.openReadingPipe(1, address);
+        this->radio.startListening();
         return 0;
     }
 

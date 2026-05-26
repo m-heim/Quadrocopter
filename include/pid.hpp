@@ -2,14 +2,15 @@
 #define PID_HPP
 #include <stdlib.h>
 
+template <class T>
 class PID
 {
 public:
     PID() {}
-    PID(float kp, float ki, float kd) : kp(kp), ki(ki), kd(kd) {}
-    PID(float kp, float ki, float kd, float integralRange1, float integralRange2) : kp(kp), ki(ki), kd(kd), integralRange1(integralRange1), integralRange2(integralRange2), useIntegralRange(true) {}
+    PID(T kp, T ki, T kd) : kp(kp), ki(ki), kd(kd) {}
+    PID(T kp, T ki, T kd, T integralRange1, T integralRange2) : kp(kp), ki(ki), kd(kd), integralRange1(integralRange1), integralRange2(integralRange2), useIntegralRange(true) {}
     ~PID() {}
-    float update(float val, float set, float step)
+    T update(T val, T set, T step)
     {
         error = val - set;
         error_derivative = error - prev_err;
@@ -20,7 +21,7 @@ public:
         prev_err = error;
         return getValue();
     }
-    float getValue()
+    T getValue()
     {
         val = 0;
         val += error * kp;
@@ -30,24 +31,27 @@ public:
     }
 
 private:
-    float integralRange1;
-    float integralRange2;
-    float kp;
-    float ki;
-    float kd;
+    T kp;
+    T ki;
+    T kd;
     bool useIntegralRange = false;
-    float prev_err = 0;
-    float val = 0;
-    float error = 0;
-    float error_sum = 0;
-    float error_derivative = 0;
+    T integralRange1;
+    T integralRange2;
+
+    T prev_err = 0;
+    T val = 0;
+
+    T error = 0;
+    T error_sum = 0;
+    T error_derivative = 0;
 };
 
+template <class T>
 class Filter
 {
 public:
     Filter() {}
-    Filter(float factor) : factor(factor)
+    Filter(T factor) : factor(factor)
     {
         if (factor < 0 || factor > 1)
         {
@@ -55,20 +59,22 @@ public:
         }
     }
     ~Filter() {}
-    float update(float value)
+    T update(T value)
     {
         val = (factor * value) + ((1 - factor) * val);
         return getValue();
     }
-    float getValue() {
+    T getValue() {
         return val;
     }
 
 private:
-    float factor = 0;
-    float val = 0;
+    T factor = 0;
+    T val = 0;
 };
-float inRange(float val, float r1, float r2)
+
+template <class T>
+T inRange(T val, T r1, T r2)
 {
     if (val < r1)
     {

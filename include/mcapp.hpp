@@ -7,17 +7,21 @@
 #include "Arduino.h"
 #include "communication_provider.hpp"
 
-class IOHandler {
-    public:
+class IOHandler
+{
+public:
     virtual void send(const char *msg, int len) = 0;
 };
 
-class UartIOHandler : public IOHandler {
-    public:
-    void send(const char *msg, int len) override {
+class UartIOHandler : public IOHandler
+{
+public:
+    void send(const char *msg, int len) override
+    {
         Serial.write(msg, len);
     }
-    int recv(char *buf, int len) {
+    int recv(char *buf, int len)
+    {
         return Serial.readBytes(buf, len);
     }
 };
@@ -51,6 +55,8 @@ public:
 
     bool handle2(int8_t *buf, bool error, bool gyroSetup, SenderPayload *senderPayload);
 
+    bool startupSender();
+
     void noPackageAction()
     {
         log("No package");
@@ -66,6 +72,7 @@ public:
     {
         return MCAPP_VERSION;
     }
+    bool handleInput();
     void printPayload(ReceiverPayload p)
     {
         if (Serial)
@@ -114,6 +121,26 @@ public:
         }
         tone(piezoPin, freq, dur);
     }
+
+    bool command(MessageType type, uint8_t *data, uint8_t length)
+    {
+        if (length > PAYLOAD_LENGTH - 2)
+        {
+            log("C.Send 0");
+            return false;
+        }
+        SenderPayload p;
+        memcpy(&p, data, sizeof(p));
+        remote->getBuf()[0] = type;
+        remote->getBuf()[1] = length;
+        memcpy(remote->getBuf() + 2, &p, length);
+        remote->disableReceive();
+        remote->write(remote->getBuf(), length + 2);
+        remote->enableReceive();
+        log("C.Send 1");
+        return true;
+    }
+
     // infinite loop led error
     void ledError()
     {
@@ -198,10 +225,13 @@ private:
     float voltage;
     bool ledState = false;
     int freq = FREQ_BASE;
-    long msg_a; // last control packet
-    bool isConnected = false; // connection status
+    long msg_a;                             // last control packet
+    bool isConnected = false;               // connection status
     ReceiverPayload payload = {0, 0, 0, 0}; // current payload
     uint8_t msgBuf[PAYLOAD_LENGTH];
     uint32_t msg_n = 0;
+    int8_t vals[4];
+    long msg_b;
+    SenderPayload senderPayload;
 };
 #endif

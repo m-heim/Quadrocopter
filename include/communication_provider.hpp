@@ -3,7 +3,7 @@
 #define COMMUNICATION_PROVIDER_HPP_
 #define PAYLOAD_LENGTH 35
 
-enum
+typedef enum
 {
     IDLE = 20,
     OK,
@@ -11,8 +11,9 @@ enum
     BATTERY
 } Status;
 
-enum
+typedef enum
 {
+    IDLE = 0,
     HELLO = 10,
     BYE,
     CONFIG,
@@ -52,9 +53,11 @@ class CommunicationProvider
     public:
     virtual int read() = 0;
     virtual bool write(void *buf, uint8_t len) = 0;
+    virtual int setEndpoint(const uint8_t *address) = 0;
+    virtual int setRead(const uint8_t *address) = 0;
     virtual int enableReceive() = 0;
     virtual int disableReceive() = 0;
-    const uint8_t *getBuf() {
+    uint8_t *getBuf() {
         return msgBuf;
     }
     protected:
