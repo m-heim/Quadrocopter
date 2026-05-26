@@ -7,10 +7,12 @@
 #define INVOLTAGE A7
 #define RECEIVER_SLEEP 20
 #define SENDER_SLEEP (RECEIVER_SLEEP * 2)
-#define NO_MSG 450
+#define NO_MSG 0.45
 #define VOLTAGE 11.4
 #define GRAVITY 4000
 #define DEBUG 0
+
+#define SENDER_INPUT_NO_MSG 0.4
 
 #if SENDER == 1
 #define CE_PIN 7
