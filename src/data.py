@@ -20,7 +20,7 @@ def data_send(s, speed: float, steer: float,  yaw: float, roll: float) -> None:
     #print("Sending data" +  str(speed) + str(steer))
     #print(int.to_bytes(int(speed * 127), length=1, signed=True))
     #print(int.to_bytes(int(steer * 127), length=1, signed=True))
-    data = b'c' + str(int(speed * 127)).encode('utf-8') + b',' + str(int(steer * 127)).encode('utf-8') + b',' + str(int(yaw * 127)).encode('utf-8') + b',' + str(int(roll * 127)).encode('utf-8') + b'\n'
+    data = b'\x06' + str(hex(int(speed * 127))).encode('utf-8') + b',' + str(hex(int(steer * 127))).encode('utf-8') + b',' + str(hex(int(yaw * 127))).encode('utf-8') + b',' + str(hex(int(roll * 127))).encode('utf-8') + b'\0'
     s.write(data)
     #print("Data" + str(list(data)))
 
@@ -51,7 +51,7 @@ def main():
         print("Usage: python data.py <serial_port>")
         sys.exit(1)
 
-    with serial.Serial(sys.argv[1], 9600, timeout=10) as s:
+    with serial.Serial(sys.argv[1], 115200, timeout=10) as s:
         joysticks = joystick_setup()
         print(f'Found {pygame.joystick.get_count()} joysticks on ports')
         while True:

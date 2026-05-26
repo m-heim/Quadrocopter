@@ -4,20 +4,13 @@
 #include <Adafruit_MPU6050.h>
 #include <pid.hpp>
 
+#if SENDER == 0
 #define SERVOS 4
 #define PIDS 2
 #define PIEZO 4
 #define LED 5
 #define INVOLTAGE A7
 #define GRAVITY 4000
-
-#if SENDER == 1
-#define CE_PIN 7
-#define CSN_PIN 8
-#else
-#define CE_PIN 7
-#define CSN_PIN 8
-#endif
 
 #define FRONT 0x00
 #define BACK 0x02
@@ -32,9 +25,8 @@
 #define EXPONENTIAL_FACTOR 0.45
 #define LP (1 - 0.45)
 
-NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
-UartIOHandler uartIOHandler = UartIOHandler();
-extern MCApp app(&radio, uartIOHandler);
+extern NRF24L01Provider radio;
+extern MCApp app;
 sensors_event_t am, g, temp;
 Adafruit_MPU6050 a;
 int servoPins[SERVOS] = {A0, A1, A2, A3};
@@ -117,23 +109,24 @@ void setGravity()
   app.log("Setting gravity ok");
 }
 
-void initGyro() {
-    bool a1 = a.begin();
-    if (a1)
-    {
-      app.log(F("G 1"));
-      a.setGyroRange(MPU6050_RANGE_500_DEG);
-      a.setFilterBandwidth(MPU6050_BAND_184_HZ);
-      a.setSampleRateDivisor(7);
-      delay(100);
-      gyro = true;
-      //setGravity();
-    }
-    else {
-      app.log(F("G 0"));
-    }
+void initGyro()
+{
+  bool a1 = a.begin();
+  if (a1)
+  {
+    app.log(F("G 1"));
+    a.setGyroRange(MPU6050_RANGE_500_DEG);
+    a.setFilterBandwidth(MPU6050_BAND_184_HZ);
+    a.setSampleRateDivisor(7);
+    delay(100);
+    gyro = true;
+    // setGravity();
+  }
+  else
+  {
+    app.log(F("G 0"));
+  }
 }
-
 
 void setAlpha()
 {
@@ -146,14 +139,18 @@ void setAlpha()
   alphaY1 -= gravity[0];
   alphaX = (LP * alphaX) + ((1 - LP) * alphaX1);
   alphaY = (LP * alphaY) + ((1 - LP) * alphaY1);
-  if (isnan(alphaX) || isnan(alphaY)) {
+  if (isnan(alphaX) || isnan(alphaY))
+  {
     app.log("Nan");
     alphaX = 0;
     alphaY = 0;
-    if (index == 18) { // if we have 18 readings, reset gyro to try to fix it
+    if (index == 18)
+    { // if we have 18 readings, reset gyro to try to fix it
       initGyro();
       index = 0;
-    } else {
+    }
+    else
+    {
       index += 1;
     }
   }
@@ -171,17 +168,17 @@ void setValues()
   setGyro();
 }
 
-void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
+void setSpeeds(int8_t sVals[4], bool motorsApply, bool gyroApply)
 {
   float speeds[4];
   setValues();
-  pitchVal = filters[0].update(pids[0].update(alphaY, app.getPayload().pitch / 4, 1));
-  rollVal = filters[1].update(pids[1].update(alphaX, app.getPayload().roll / 4, 1));
+  pitchVal = filters[0].update(pids[0].update(alphaY, sVals[1] / 4.0, 1));
+  rollVal = filters[1].update(pids[1].update(alphaX, sVals[2] / 4.0, 1));
   float pp = inRange<float>(pitchVal, -16, 16); // - (yGyro / 4);
   float rr = inRange<float>(rollVal, -16, 16);  // + (xGyro / 4);
   for (int i = 0; i < 4; i++)
   {
-    speeds[i] = p.speed;
+    speeds[i] = speeds[i];
     if (gyroApply)
     {
       if (i & BACK)
@@ -237,7 +234,8 @@ void printVoltage()
     Serial.print("\n");
   }
 }
-void initAccelerometer() {
+void initAccelerometer()
+{
   for (int i = 0; i < 10; i++)
   {
     app.log("I1");
@@ -265,7 +263,8 @@ void initAccelerometer() {
   }
 }
 
-void initPIDS() {
+void initPIDS()
+{
   for (int i = 0; i < PIDS; i++)
   {
     pids[i] = PID<float>(0.18, 0.0, 0.18, -4, 4);
@@ -273,9 +272,9 @@ void initPIDS() {
   }
 }
 
-
-void startup() {
-      app.log("1");
+void startup()
+{
+  app.log("1");
   app.initLed(LED);
   app.initPiezo(PIEZO);
   app.initVoltage(INVOLTAGE, 3, 8);
@@ -293,3 +292,4 @@ void startup() {
   delay(100);
   app.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on
 }
+#endif

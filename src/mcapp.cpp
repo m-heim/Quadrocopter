@@ -1,191 +1,162 @@
 #include "mcapp.hpp"
 #include "WString.h"
 
-bool MCApp::handle(SenderPayload &p)
+int MCApp::handle(SenderPayload &p)
 {
     msg_n += 1;
-    bool valid = false;
-    if (remote->read() > 0)
+    int msgs = -1;
+    int l = remote->read();
+    if (l > 0)
     { // is there a payload? get the pipe number that recieved it
-        valid = true;
-        const uint8_t *o = remote->getBuf();
-        // setup gyro
-        if (o[0] == GYRO_SETUP)
+        uint8_t *o = remote->getBuf();
+        log("Receiver.Received");
+        if (o[0] == PACKAGE)
         {
-            log("Received gyro setup");
-            // setGravity();
-        }
-        // setup motor
-        else if (o[0] == MOTOR_SETUP)
-        {
-            log("Received motor setup");
-        }
-        // control message
-        else if (o[0] == CONTROL)
-        {
-            log("Received payload");
-            memcpy(&payload, o + 2, sizeof(payload));
-            printPayload(payload);
-            msg_a = millis();
-        }
-        else
-        {
-            log("Invalid message");
-            valid = false;
-        }
-    }
-    else
-    {
-        log(F("Recv 0"));
-    }
-    if (!recentMessage())
-    {
-        noPackageAction();
-        valid = false;
-    }
-    else
-    {
-    }
-    if ((msg_n % 10) == 0)
-    {
-        bool report = command(STATUS_RECEIVER, (uint8_t *)&p, sizeof(p));
-        if (report)
-        {
-            log(F("Send 1"));
-        }
-        else
-        {
-            log(F("Send 0"));
-        }
-    }
-    return valid;
-}
-
-bool MCApp::handleInput()
-{
-    bool gyroSetup = false;
-    int8_t uartData[35] = {0};
-    if (Serial) // read from uart
-    {
-        String s = Serial.readStringUntil('\n');
-        if (s.length() < 1) // if we didn't get any data, do nothing (instead of applying old data or random data)
-        {
-            log("No action");
-        }
-        else if (s.length() >= (1 + 4 + 3) && s.charAt(0) == 'c') // we have a speed change command, it should be in the format c<speed0><speed1><speed2><speed3>\n, where speeds are between -127 and 127
-        {
-            int index = 1;
-            for (int i = 0; i < 4; i++)
+            msgs = messageHandler.parsePackage(o, messages, MESSAGES);
+            if (msgs >= 1)
             {
-                String numStr = s.substring(index, s.indexOf(',', index));
-                if (numStr.length() >= 1)
-                {
-                    vals[i] = (int8_t)numStr.toInt();
-                }
-                else
-                {
-                    vals[i] = 0;
-                }
-                index += numStr.length() + 1;
+                timer.start();
             }
-            log("Got speed change");
-            msg_b = millis();
+            log(F("Receiver.Received 1"));
         }
-        else if (s.charAt(0) == 's') // we have a gyro setup command, it should be just s\n
+        else
         {
-            log("Sending setup");
-            gyroSetup = true;
+            log(F("Receiver.Received Err"));
         }
-    }
-    handle2(vals, (millis() - msg_b) > NO_MSG, gyroSetup, &senderPayload);
-    char buf[35];
-    sprintf(buf, "%d %d", (int)senderPayload.position2[0] / 127 * 180, (int)senderPayload.position2[1] / 127 * 180);
-    log(buf);
-    delay(SENDER_SLEEP);
-    return true;
-}
-
-bool MCApp::startupSender()
-{
-    log("S.Sup.Init");
-    msg_b = millis() - NO_MSG - 1; // set last message time to a while ago so that it doesn't fail if we don't get a message right away
-    Serial.setTimeout(100); // 100 ms timeout for serial read, adjust if needed
-    remote->setEndpoint(address[0]);
-    remote->setRead(address[1]);
-    remote->disableReceive();
-    log("S.Sup.Init 1");
-    return true;
-}
-
-bool MCApp::handle2(int8_t *buf, bool error, bool gyroSetup, SenderPayload *senderPayload)
-{
-    msg_n += 1;
-    int payloadLength = 0;
-    int action = 1;
-    if (gyroSetup)
-    {
-        msgBuf[0] = GYRO_SETUP;
-        msgBuf[1] = 0;
-        payloadLength = 2;
-        command(GYRO_SETUP, nullptr, 0);
-        log("Sending setup");
-    }
-    else if (action == 1)
-    {
-        msgBuf[0] = CONTROL;
-        msgBuf[1] = 4;
-        payloadLength = 2 + sizeof(ReceiverPayload);
-        payload.speed = buf[0];
-        payload.pitch = buf[1];
-        payload.yaw = buf[2];
-        payload.roll = buf[3];
-        if (error)
+        if (timer.isExpired())
         {
-            payload.speed = 0;
-            payload.pitch = 0;
-            payload.yaw = 0;
-            payload.roll = 0;
+            noPackageAction();
         }
-        command(CONTROL, (uint8_t *)&payload, sizeof(payload));
-        log("Sending");
+        else
+        {
+        }
+        if ((msg_n % 10) == 0)
+        {
+            Message voltageMessage;
+            float voltage = getVoltage();
+            voltageMessage.init(STATUS_VOLTAGE, sizeof(float), (uint8_t *)&p.voltage);
+            Message orientationMessage;
+            float orientation[2] = {p.orientation[0], p.orientation[1]};
+            orientationMessage.init(STATUS_ORIENTATION, sizeof(orientation), (uint8_t *)orientation);
+            Message msgs[2] = {voltageMessage, orientationMessage};
+            int payloadLength = messageHandler.buildPackage(msgs, sizeof(msgs) / sizeof(msgs[0]), msgBuf);
+            getRemote()->disableReceive();
+            bool report = remote->write(msgBuf, payloadLength);
+            getRemote()->enableReceive();
+            if (report)
+            {
+                log(F("Receiver.Send 1"));
+            }
+            else
+            {
+                log(F("Receiver.Send 0"));
+            }
+        }
     }
     else
     {
-        log("Unknown action");
+        log(F("Receiver.Received 0"));
     }
+    return msgs;
+}
+
+bool MCApp::handle2(const QuadrocopterMessage &p, bool valid)
+{
+    log(F("Sender.Handle"));
+    msg_n += 1;
+    Message gyroSetupMessage;
+    Message speedMessage;
+    uint8_t gyroSetupMessageBuf[1];
+    gyroSetupMessageBuf[0] = p.gyroSetup ? (uint8_t)'1' : (uint8_t)'0';
+    gyroSetupMessage.init(GYRO_SETUP, 1, gyroSetupMessageBuf);
+    uint8_t speedMessageBuf[4];
+    if (valid)
+    {
+        memcpy(speedMessageBuf, p.speeds, 4);
+    }
+    else
+    {
+        memset(speedMessageBuf, 0, 4);
+    }
+    speedMessage.init(CONTROL, 4, speedMessageBuf);
+    Message msgs[2] = {gyroSetupMessage, speedMessage};
+    int payloadLength = messageHandler.buildPackage(msgs, sizeof(msgs) / sizeof(msgs[0]), msgBuf);
     getRemote()->disableReceive();
     bool report = getRemote()->write(msgBuf, payloadLength);
     getRemote()->enableReceive();
     if (report)
     {
-        log("Message was successfully transmitted");
-        msg_a = millis();
+        log(F("Sender.Send 1"));
+        timer.start();
     }
     else
     {
-        log("No ack from receiver");
+        log(F("Sender.Send 0"));
     }
-    if (!recentMessage())
+    if (timer.isExpired())
     {
         noPackageAction();
-        log("No recent message");
+        log(F("Sender.Send.Err 1"));
     }
     if (getRemote()->read() > 0)
     { // is there a payload? get the pipe number that recieved it
-        const uint8_t *o = getRemote()->getBuf();
-        if (o[0] == STATUS_RECEIVER)
+        log(F("Sender.Received 1"));
+        uint8_t *o = getRemote()->getBuf();
+        int msgs = messageHandler.parsePackage(o, messages, MESSAGES);
+        for (int i = 0; i < msgs; i++)
         {
-            log("Recv 1");
-            memcpy(senderPayload, o + 2, sizeof(*senderPayload));
-        }
-        else
-        {
-            log(F("Recv 2"));
+            if (messages[i].getMsg() == STATUS_VOLTAGE)
+            {
+                float voltage = *((float *)messages[i].getData());
+                log(F("Sender.Received.Voltage:"));
+                log(String(voltage).c_str());
+            }
+            /*else if (messages[i].getMsg() == STATUS_SPEEDS)
+            {
+                log(F("Sender.Received.Speeds:"));
+                char buf[20];
+                for (int j = 0; j < 4; j++)
+                {
+                    snprintf(buf + j * 5, 5, "%d ", (int8_t)messages[i].getData()[j]);
+                }
+                log(buf);
+            }
+            else if (messages[i].getMsg() == STATUS_HEIGHT)
+            {
+                float height = *((float *)messages[i].getData());
+                log(F("Sender.Received.Height:"));
+                log(String(height).c_str());
+            }
+            else if (messages[i].getMsg() == STATUS_ORIENTATION)
+            {
+                float pitch = *((float *)messages[i].getData());
+                float roll = *((float *)(messages[i].getData() + 4));
+                log(F("Sender.Received.Orientation:"));
+                char buf[40];
+                snprintf(buf, 40, "Pitch: %f Roll: %f", pitch, roll);
+                log(buf);
+            }
+            else if (messages[i].getMsg() == STATUS_POSITION)
+            {
+                float x = *((float *)messages[i].getData());
+                float y = *((float *)(messages[i].getData() + 4));
+                log(F("Sender.Received.Position:"));
+                char buf[40];
+                snprintf(buf, 40, "X: %f Y: %f", x, y);
+                log(buf);
+            }
+            else
+            {
+                log(F("Sender.Received.Unknown:"));
+                char buf[20];
+                snprintf(buf, 20, "Msg: %d Len: %d", messages[i].getMsg(), messages[i].getLength());
+                log(buf);
+            }*/
         }
     }
     else
     {
-        log("Recv 0");
+        log(F("Sender.Received 0"));
     }
     return report;
 }
