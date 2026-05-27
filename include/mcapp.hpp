@@ -24,9 +24,36 @@ typedef struct
     float voltage;
 } SenderPayload;
 
+class InputPayload
+{
+public:
+    InputPayload(uint8_t *defaultBuf, int defaultBufLen) : len(0), valid(false)
+    {
+        memcpy(this->defaultBuf, defaultBuf, defaultBufLen);
+        this->defaultBufLen = defaultBufLen;
+    }
+    void setBuf(uint8_t *buf, int len)
+    {
+        memcpy(this->buf, buf, len);
+        this->len = len;
+        this->valid = true;
+    }
+    void invalidate() { this->valid = false; }
+    uint8_t *getBuf() { return valid ? buf : defaultBuf; }
+    int getLen() { return valid ? len : defaultBufLen; }
+    bool isValid() { return valid; }
+
+private:
+    uint8_t buf[PAYLOAD_LENGTH];
+    int len;
+    bool valid;
+    uint8_t defaultBuf[PAYLOAD_LENGTH];
+    int defaultBufLen;
+};
+
 class InputHandler
 {
-    virtual bool handle(MessageHandler *messageHandler, Message *messages) = 0;
+    virtual bool handle(InputPayload &p) = 0;
 };
 class UartInputHandler : public InputHandler
 {
@@ -35,34 +62,39 @@ public:
     {
         if (Serial)
         {
-            Serial.begin(115200);
+            // Serial.begin(115200);
             Serial.setTimeout(10);
         }
     }
-    bool handle(MessageHandler *messageHandler, Message *messages) override
+    bool handle(InputPayload &p) override
     {
         if (!Serial)
         {
+            p.invalidate();
             return false;
         }
         String s = Serial.readStringUntil('\0');
-        Serial.println("Received: " + s);
+        // Serial.println("Received: " + s);
         if (s.length() < 1) // if we didn't get any data, do nothing (instead of
                             // applying old data or random data)
         {
+            p.invalidate();
             return false;
         }
         uint8_t buf[PAYLOAD_LENGTH];
-        for (int i = 0; (i * 2) < s.length() && i < sizeof(buf); i += 1)
+        int i = 0;
+        while ((i * 2 + 1) < s.length() && i < sizeof(buf))
         {
             buf[i] = (s.charAt(i * 2) - '0') << 4 | (s.charAt((i * 2) + 1) - '0');
+            i++;
         }
-        if (buf[0] == PACKAGE && messageHandler->parsePackage(buf, messages, MESSAGES) > 0)
+        if (i >= sizeof(buf))
         {
-            timer.start();
-            return true;
+            p.invalidate();
+            return false;
         }
-        return false;
+        p.setBuf(buf, i);
+        return true;
     }
     bool isRecent() { return !timer.isExpired(); }
 
@@ -75,6 +107,7 @@ class Logger
 public:
     Logger(bool enabled) : enabled(enabled) {}
     virtual void log(const char *msg) = 0;
+    virtual void log(const __FlashStringHelper *msg) = 0;
 
 protected:
     bool enabled;
@@ -83,12 +116,12 @@ protected:
 class ArduinoLogger : public Logger
 {
 public:
-    ArduinoLogger(bool enabled, int baud) : Logger(enabled)
+    ArduinoLogger(bool enabled, uint32_t baud) : Logger(enabled)
     {
         if (enabled && Serial)
         {
             Serial.begin(baud);
-            Serial.println("ArduinoLogger.Init 1");
+            // Serial.println("AL.I 1");
         }
     }
     void log(const char *msg) override
@@ -98,14 +131,24 @@ public:
             Serial.println(msg);
         }
     }
+    void log(const __FlashStringHelper *msg) override
+    {
+        if (enabled && Serial)
+        {
+            Serial.println(msg);
+        }
+    }
 };
 
-class MCApp
+class Buzzer
 {
 public:
-    MCApp(CommunicationProvider *remote, Logger *logger) : remote(remote), logger(logger)
+    Buzzer(int pin) : pin(pin)
     {
-        pinMode(LED_BUILTIN, OUTPUT);
+        if (pin != NO_PIN)
+        {
+            pinMode(pin, OUTPUT);
+        }
     }
     void output(int start, int stop, int step, float seconds)
     {
@@ -116,60 +159,28 @@ public:
             delay(s);
         }
     }
-    CommunicationProvider *getRemote() { return this->remote; }
-
-    bool recentMessage() { return !timer.isExpired(); }
-    int handle(SenderPayload &payload);
-
-    bool handle2(const QuadrocopterMessage &p, bool valid);
-
-    void noPackageAction()
-    {
-        logger->log("No package");
-        setLed(1);
-        buzz(freq, 10);
-        freq += 400;
-        if (freq > 4000)
-        {
-            freq = FREQ_BASE;
-        }
-    }
-    int getVersion() { return MCAPP_VERSION; }
-    float getVoltage()
-    {
-        if (voltagePin == -1)
-        {
-            return 0;
-        }
-        else
-        {
-            return (analogRead(voltagePin) / 1024) * voltageFactor;
-        }
-    }
-    bool verifyVoltage()
-    {
-        return (voltagePin == NO_PIN) || (getVoltage() > voltage);
-    }
-    void initPiezo(int pin)
-    {
-        pinMode(pin, OUTPUT);
-        piezoPin = pin;
-    }
-    void initVoltage(int pin, float factor, float v)
-    {
-        pinMode(pin, INPUT);
-        voltagePin = pin;
-        voltageFactor = factor;
-        voltage = v;
-    }
-    // buzz if possible
     void buzz(int freq, int dur)
     {
-        if (piezoPin == NO_PIN)
+        if (pin == NO_PIN)
         {
             return;
         }
-        tone(piezoPin, freq, dur);
+        tone(pin, freq, dur);
+    }
+
+private:
+    int pin;
+};
+
+class Led
+{
+public:
+    Led(int pin) : pin(pin)
+    {
+        if (pin != NO_PIN)
+        {
+            pinMode(pin, OUTPUT);
+        }
     }
     // infinite loop led error
     void ledError()
@@ -185,24 +196,15 @@ public:
     void initLed(int pin)
     {
         pinMode(pin, OUTPUT);
-        this->ledPin = pin;
-    }
-    void infinite()
-    {
-        while (1)
-        {
-        }
+        this->pin = pin;
     }
     void setLed(int val)
     {
-        if (this->ledPin == NO_PIN)
+        if (this->pin == NO_PIN)
         {
             return;
         }
-        else
-        {
-            digitalWrite(ledPin, val);
-        }
+        digitalWrite(pin, val);
     }
     // toggle led state and set
     void ledToggle()
@@ -210,22 +212,96 @@ public:
         this->setLed(ledState);
         ledState = !ledState;
     }
-    CommunicationProvider *remote;
-    Logger *logger;
-    MessageHandler messageHandler;
-    Message messages[MESSAGES];
 
 private:
-    int voltagePin = NO_PIN;
-    int piezoPin = NO_PIN;
-    int ledPin = NO_PIN;
-    float voltageFactor = 1.0;
-    float voltage;
+    int pin;
     bool ledState = false;
+};
+
+class VoltageHandler
+{
+public:
+    VoltageHandler(int pin, float factor, float voltage) : pin(pin), voltageFactor(factor), voltage(voltage)
+    {
+        if (pin != NO_PIN)
+        {
+            pinMode(pin, INPUT);
+        }
+    }
+    float getVoltage()
+    {
+        if (pin == NO_PIN)
+        {
+            return 0;
+        }
+        return (analogRead(pin) / 1024) * voltageFactor;
+    }
+    bool verifyVoltage()
+    {
+        return (pin == NO_PIN) || (getVoltage() > voltage);
+    }
+
+private:
+    int pin = NO_PIN;
+    float voltageFactor = 1.0;
+    float voltage = 0;
+};
+
+class MCApp
+{
+public:
+    MCApp(CommunicationProvider *remote, Logger *logger, Buzzer *buzzer, Led *led, VoltageHandler *voltageHandler) : remote(remote), logger(logger), buzzer(buzzer), led(led), voltageHandler(voltageHandler)
+    {
+        pinMode(LED_BUILTIN, OUTPUT);
+    }
+    CommunicationProvider *getRemote() { return this->remote; }
+
+    bool recentMessage() { return !timer.isExpired(); }
+
+    void noPackageAction()
+    {
+        logger->log(FLASH_STRING("App.N"));
+        led->setLed(1);
+        buzzer->buzz(freq, 10);
+        freq += 400;
+        if (freq > 4000)
+        {
+            freq = FREQ_BASE;
+        }
+    }
+    int getVersion() { return MCAPP_VERSION; }
+    void infinite()
+    {
+        while (1)
+        {
+        }
+    }
+    CommunicationProvider *remote;
+    Logger *logger;
+    Buzzer *buzzer;
+    MessageHandler messageHandler;
+    VoltageHandler *voltageHandler;
+    Led *led;
+    Message messages[MESSAGES];
+
+protected:
     int freq = FREQ_BASE;
-    bool isConnected = false; // connection status
     uint8_t msgBuf[PAYLOAD_LENGTH];
     ArduinoTimer timer = ArduinoTimer(NO_MSG);
     int msg_n = 0; // message counter, used for logging and other purposes
+};
+
+class MCAppReceiver : public MCApp
+{
+public:
+    MCAppReceiver(CommunicationProvider *remote, Logger *logger, Buzzer *buzzer, Led *led, VoltageHandler *voltageHandler) : MCApp(remote, logger, buzzer, led, voltageHandler) {}
+    int handle();
+};
+
+class MCAppSender : public MCApp
+{
+public:
+    MCAppSender(CommunicationProvider *remote, Logger *logger, Buzzer *buzzer, Led *led, VoltageHandler *voltageHandler) : MCApp(remote, logger, buzzer, led, voltageHandler) {}
+    int handle(InputPayload &p);
 };
 #endif

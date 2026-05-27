@@ -3,10 +3,7 @@
 #include "nrf24l01_provider.hpp"
 #include "pid.hpp"
 #include "utils.hpp"
-#include "vehicle.hpp"
-#include <Adafruit_MPU6050.h>
 #include <Arduino.h>
-#include <Servo.h>
 #if SENDER == 0
 #if VEHICLE == 1
 #include "vehicle.hpp"
@@ -14,7 +11,7 @@
 #if VEHICLE == 0
 #include "quadrocopter.hpp"
 #endif
-#endif
+#else
 
 // It is very helpful to think of an address as a path instead of as
 // an identifying device destination
@@ -22,8 +19,14 @@ uint8_t radioNumber =
     SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
 NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
 ArduinoLogger logger(DEBUG, BAUD);
-MCApp app = MCApp(&radio, &logger);
+Buzzer buzzer = Buzzer(NO_PIN);
+Led led = Led(NO_PIN);
+VoltageHandler voltageHandler(NO_PIN, 0, 0);
+MCAppSender app(&radio, &logger, &buzzer, &led, &voltageHandler);
 UartInputHandler uartInputHandler{};
+
+uint8_t defaultBuf[] = {0x04, 0x06, 0x06, 0x04, 0x00, 0x00, 0x00, 0x00};
+InputPayload inputPayload = InputPayload((uint8_t *)defaultBuf, sizeof(defaultBuf));
 
 void startupSender()
 {
@@ -32,19 +35,21 @@ void startupSender()
   radio.getRadio().startListening();
 }
 
+#endif
+
 void setup()
 {
-  app.logger->log("Init");
+  app.logger->log(FLASH_STRING("Init"));
   delay(100);
   // put your setup code here, to run once:
   if (!radio.init())
   {
-    app.logger->log("Init.RF24 0");
-    app.ledError();
+    app.logger->log(FLASH_STRING("Init.RF24 0"));
+    app.led->ledError();
   }
   else
   {
-    app.logger->log("Init.RF24 1");
+    app.logger->log(FLASH_STRING("Init.RF24 1"));
   }
 #if SENDER == 0
   startup();
@@ -52,43 +57,24 @@ void setup()
 #if SENDER == 1
   startupSender();
 #endif
-  app.logger->log("Init 1");
+  app.logger->log(FLASH_STRING("Init 1"));
 }
 
 void handleSender()
 {
-  QuadrocopterMessage p;
-  int msgs = uartInputHandler.handle(&app.messageHandler, app.messages);
-  if (msgs > 0)
+  bool valid = uartInputHandler.handle(inputPayload);
+  if (valid)
   {
-    app.logger->log("Sender.Uart.Received 1");
-    for (int i = 0; i < msgs; i++)
-    {
-      if (app.messages[i].getMsg() == CONTROL)
-      {
-        app.logger->log("Sender.Control 1");
-        uint8_t *data = app.messages[i].getData();
-        memcpy(p.speeds, data, 4);
-      }
-      else if (app.messages[i].getMsg() == GYRO_SETUP)
-      {
-        p.gyroSetup = app.messages[i].getData()[0] == '1';
-      }
-      else if (app.messages[i].getMsg() == HOVER)
-      {
-        p.hover = app.messages[i].getData()[0] == '1';
-      }
-      else
-      {
-        app.logger->log("Sender.Uart.Received Err");
-      }
-    }
+    app.logger->log(FLASH_STRING("Sender.Uart.Received 1"));
+    app.logger->log(FLASH_STRING("Sender.Uart.Received:"));
+    app.logger->log(String(inputPayload.getLen()).c_str());
+    app.logger->log((char *)inputPayload.getBuf());
   }
   else
   {
-    app.logger->log("Sender.Uart.Received 0");
+    app.logger->log(FLASH_STRING("Sender.Uart.Received 0"));
   }
-  app.handle2(p, uartInputHandler.isRecent());
+  app.handle(inputPayload);
 }
 void loop()
 {
@@ -125,7 +111,7 @@ void loop()
   setSpeeds(speedBuf, app.recentMessage(), gyroApply);
   if (!app.verifyVoltage())
   {
-    app.logger->log("Receiver.LowVoltage 1");
+    app.logger->log(FLASH_STRING("Receiver.LowVoltage 1"));
   }
 
   delay(RECEIVER_SLEEP);

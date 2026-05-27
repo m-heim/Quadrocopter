@@ -1,7 +1,7 @@
 #include "mcapp.hpp"
 #include "WString.h"
 
-int MCApp::handle(SenderPayload &p)
+int MCAppReceiver::handle()
 {
     msg_n += 1;
     int msgs = -1;
@@ -33,10 +33,10 @@ int MCApp::handle(SenderPayload &p)
         if ((msg_n % 10) == 0)
         {
             Message voltageMessage;
-            float voltage = getVoltage();
-            voltageMessage.init(STATUS_VOLTAGE, sizeof(float), (uint8_t *)&p.voltage);
+            float voltage = voltageHandler->getVoltage();
+            voltageMessage.init(STATUS_VOLTAGE, sizeof(float), (uint8_t *)&voltage);
             Message orientationMessage;
-            float orientation[2] = {p.orientation[0], p.orientation[1]};
+            float orientation[2] = {0.0, 0.0};
             orientationMessage.init(STATUS_ORIENTATION, sizeof(orientation), (uint8_t *)orientation);
             Message msgs[2] = {voltageMessage, orientationMessage};
             int payloadLength = messageHandler.buildPackage(msgs, sizeof(msgs) / sizeof(msgs[0]), msgBuf);
@@ -60,47 +60,30 @@ int MCApp::handle(SenderPayload &p)
     return msgs;
 }
 
-bool MCApp::handle2(const QuadrocopterMessage &p, bool valid)
+int MCAppSender::handle(InputPayload &p)
 {
-    logger->log("Sender.Handle");
+    logger->log(FLASH_STRING("Sender.Handle"));
     msg_n += 1;
-    Message gyroSetupMessage;
-    Message speedMessage;
-    uint8_t gyroSetupMessageBuf[1];
-    gyroSetupMessageBuf[0] = p.gyroSetup ? (uint8_t)'1' : (uint8_t)'0';
-    gyroSetupMessage.init(GYRO_SETUP, 1, gyroSetupMessageBuf);
-    uint8_t speedMessageBuf[4];
-    if (valid)
-    {
-        memcpy(speedMessageBuf, p.speeds, 4);
-    }
-    else
-    {
-        memset(speedMessageBuf, 0, 4);
-    }
-    speedMessage.init(CONTROL, 4, speedMessageBuf);
-    Message msgs[2] = {gyroSetupMessage, speedMessage};
-    int payloadLength = messageHandler.buildPackage(msgs, sizeof(msgs) / sizeof(msgs[0]), msgBuf);
     getRemote()->disableReceive();
-    bool report = getRemote()->write(msgBuf, payloadLength);
+    bool report = getRemote()->write(p.getBuf(), p.getLen());
     getRemote()->enableReceive();
     if (report)
     {
-        logger->log("Sender.Send 1");
+        logger->log(FLASH_STRING("S.S 1"));
         timer.start();
     }
     else
     {
-        logger->log("Sender.Send 0");
+        logger->log(FLASH_STRING("S.S 0"));
     }
     if (timer.isExpired())
     {
         noPackageAction();
-        logger->log("Sender.Send.Err 1");
+        logger->log(FLASH_STRING("S.S.Err 1"));
     }
     if (getRemote()->read() > 0)
     { // is there a payload? get the pipe number that recieved it
-        logger->log("Sender.Received 1");
+        logger->log(FLASH_STRING("S.R 1"));
         uint8_t *o = getRemote()->getBuf();
         int msgs = messageHandler.parsePackage(o, messages, MESSAGES);
         for (int i = 0; i < msgs; i++)
@@ -108,12 +91,12 @@ bool MCApp::handle2(const QuadrocopterMessage &p, bool valid)
             if (messages[i].getMsg() == STATUS_VOLTAGE)
             {
                 float voltage = *((float *)messages[i].getData());
-                logger->log("Sender.Received.Voltage:");
+                logger->log(FLASH_STRING("S.R.Voltage:"));
                 logger->log(String(voltage).c_str());
             }
             /*else if (messages[i].getMsg() == STATUS_SPEEDS)
             {
-                logger->log("Sender.Received.Speeds:");
+                logger->log(FLASH_STRING("S.R.Speeds:"));
                 char buf[20];
                 for (int j = 0; j < 4; j++)
                 {
@@ -124,14 +107,14 @@ bool MCApp::handle2(const QuadrocopterMessage &p, bool valid)
             else if (messages[i].getMsg() == STATUS_HEIGHT)
             {
                 float height = *((float *)messages[i].getData());
-                logger->log("Sender.Received.Height:");
+                logger->log(FLASH_STRING("Sender.Received.Height:"));
                 logger->log(String(height).c_str());
             }
             else if (messages[i].getMsg() == STATUS_ORIENTATION)
             {
                 float pitch = *((float *)messages[i].getData());
                 float roll = *((float *)(messages[i].getData() + 4));
-                logger->log("Sender.Received.Orientation:");
+                logger->log(FLASH_STRING("Sender.Received.Orientation:"));
                 char buf[40];
                 snprintf(buf, 40, "Pitch: %f Roll: %f", pitch, roll);
                 logger->log(buf);
@@ -140,14 +123,14 @@ bool MCApp::handle2(const QuadrocopterMessage &p, bool valid)
             {
                 float x = *((float *)messages[i].getData());
                 float y = *((float *)(messages[i].getData() + 4));
-                logger->log("Sender.Received.Position:");
+                logger->log(FLASH_STRING("Sender.Received.Position:"));
                 char buf[40];
                 snprintf(buf, 40, "X: %f Y: %f", x, y);
                 logger->log(buf);
             }
             else
             {
-                logger->log("Sender.Received.Unknown:");
+                logger->log(FLASH_STRING("S.R.Unknown:"));
                 char buf[20];
                 snprintf(buf, 20, "Msg: %d Len: %d", messages[i].getMsg(), messages[i].getLength());
                 logger->log(buf);
@@ -156,7 +139,7 @@ bool MCApp::handle2(const QuadrocopterMessage &p, bool valid)
     }
     else
     {
-        logger->log("Sender.Received 0");
+        logger->log(FLASH_STRING("S.R 0"));
     }
     return report;
 }
