@@ -55,7 +55,7 @@ public:
         uint8_t buf[PAYLOAD_LENGTH];
         for (int i = 0; (i * 2) < s.length() && i < sizeof(buf); i += 1)
         {
-            buf[i] = (s.charAt(i * 2) - '0') << 4 | (s.charAt((i * 2) + 1) - '0');
+            buf[i] = getNibble(s.charAt(i * 2)) << 4 | getNibble(s.charAt((i * 2) + 1));
         }
         if (buf[0] == PACKAGE && messageHandler->parsePackage(buf, messages, MESSAGES) > 0)
         {

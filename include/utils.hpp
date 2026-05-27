@@ -45,4 +45,24 @@ public:
     return millis() / 1000.0;
   }
 };
+
+uint8_t getNibble(uint8_t v)
+{
+  if (v >= '0' && v <= '9')
+  {
+    return v - '0';
+  }
+  else if (v >= 'A' && v <= 'F')
+  {
+    return v - 'A' + 10;
+  }
+  else if (v >= 'a' && v <= 'f')
+  {
+    return v - 'a' + 10;
+  }
+  else
+  {
+    return 0;
+  }
+}
 #endif
