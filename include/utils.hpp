@@ -65,4 +65,15 @@ uint8_t getNibble(uint8_t v)
     return 0;
   }
 }
+
+#ifdef ARDUINO
+#define FLASH_STRING(x) (F(x))
+#elif defined(__GNUC__) // STM32, ESP32, etc.
+#define FLASH_STRING(x) (__extension__({                           \
+  static const char __c[] __attribute__((section(".rodata"))) = x; \
+  __c;                                                             \
+}))
+#else
+#define FLASH_STRING(x) (x) // Fallback for unknown platforms
+#endif
 #endif
