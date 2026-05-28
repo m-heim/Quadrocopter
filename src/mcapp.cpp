@@ -9,56 +9,61 @@ int MCAppReceiver::handle()
     if (l > 0)
     { // is there a payload? get the pipe number that recieved it
         uint8_t *o = remote.getBuf();
+        /*for (int i = 0; i < l; i++)
+        {
+            logger.log(String(o[i], HEX).c_str());
+        }*/
         logger.log("R.R");
         if (o[0] == PACKAGE)
         {
             msgs = messageHandler.parsePackage(o, messages, MESSAGES);
             if (msgs >= 1)
             {
-                timer.start();
-            }
-            logger.log("R.R 1");
-        }
-        else
-        {
-            logger.log("R.R Err");
-        }
-        if (timer.isExpired())
-        {
-            noPackageAction();
-        }
-        else
-        {
-        }
-        if ((msg_n % 18) == 0)
-        {
-            Message voltageMessage;
-            float voltage = voltageHandler.getVoltage();
-            voltageMessage.init(STATUS_VOLTAGE, sizeof(float), (uint8_t *)&voltage);
-            Message orientationMessage;
-            float orientation[2] = {0.0, 0.0};
-            orientationMessage.init(STATUS_ORIENTATION, sizeof(orientation), (uint8_t *)orientation);
-            Message eventMessage;
-            uint8_t event[1] = {0};
-            eventMessage.init(STATUS_EVENT, sizeof(event), event);
-            Message msgs[] = {voltageMessage, orientationMessage, eventMessage};
-            int payloadLength = messageHandler.buildPackage(msgs, sizeof(msgs) / sizeof(msgs[0]), msgBuf);
-            getRemote().disableReceive();
-            bool report = remote.write(msgBuf, payloadLength);
-            getRemote().enableReceive();
-            if (report)
-            {
-                logger.log("R.S 1");
+                logger.log(FLASH_STRING("R.R 1"));
             }
             else
             {
-                logger.log("R.S 0");
+                logger.log(FLASH_STRING("R.R Err"));
             }
         }
+        else
+        {
+            logger.log(FLASH_STRING("R.R Err"));
+        }
+    }
+    if (!recentMessage())
+    {
+        noPackageAction();
+        logger.log(FLASH_STRING("R.R.R 0"));
     }
     else
     {
-        logger.log("R.R 0");
+        logger.log(FLASH_STRING("R.R.R 1"));
+    }
+    if ((msg_n % 18) == 0)
+    {
+        Message voltageMessage;
+        float voltage = voltageHandler.getVoltage();
+        voltageMessage.init(STATUS_VOLTAGE, sizeof(float), (uint8_t *)&voltage);
+        Message orientationMessage;
+        float orientation[2] = {0.0, 0.0};
+        orientationMessage.init(STATUS_ORIENTATION, sizeof(orientation), (uint8_t *)orientation);
+        Message eventMessage;
+        uint8_t event[1] = {0};
+        eventMessage.init(STATUS_EVENT, sizeof(event), event);
+        Message msgs[] = {voltageMessage, orientationMessage, eventMessage};
+        int payloadLength = messageHandler.buildPackage(msgs, sizeof(msgs) / sizeof(msgs[0]), msgBuf);
+        getRemote().disableReceive();
+        bool report = remote.write(msgBuf, payloadLength);
+        getRemote().enableReceive();
+        if (report)
+        {
+            logger.log(FLASH_STRING("R.S 1"));
+        }
+        else
+        {
+            logger.log("R.S 0");
+        }
     }
     return msgs;
 }
@@ -68,6 +73,10 @@ int MCAppSender::handle(InputPayload &p)
     logger.log(FLASH_STRING("S.H"));
     msg_n += 1;
     getRemote().disableReceive();
+    for (int i = 0; i < p.getLen(); i++)
+    {
+        logger.log(String(p.getBuf()[i], HEX).c_str());
+    }
     bool report = getRemote().write(p.getBuf(), p.getLen());
     getRemote().enableReceive();
     if (report)
@@ -79,7 +88,7 @@ int MCAppSender::handle(InputPayload &p)
     {
         logger.log(FLASH_STRING("S.S 0"));
     }
-    if (timer.isExpired())
+    if (!recentMessage())
     {
         noPackageAction();
         logger.log(FLASH_STRING("S.S.Err 1"));

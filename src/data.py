@@ -16,13 +16,36 @@ BRAKE_BUTTON = 4
 AXIS_BUTTON = 5
 SETTING_BUTTON = 3
 
+class MCAppMessage:
+    def __init__(self, msg: int, msgBuf):
+        self.msg = msg
+        self.msgBuf = msgBuf
+    def build(self):
+        b = bytearray()
+        b.append(self.msg)
+        b.append(len(self.msgBuf))
+        b += self.msgBuf
+        return b
+    
+class UartSender:
+    def __init__(self, encoding: str = "hex"):
+        self.encoding = encoding
+    def send(self, msg, s):
+        if self.encoding == "hex":
+            msgBuf = msg.hex().encode('utf-8') + bytes(0x00)
+            print("Data: " + str(msgBuf))
+            s.write(msgBuf)
+
+
+sender = UartSender()
+
 def data_send(s, speed: float, steer: float,  yaw: float, roll: float) -> None:
+    m1 = MCAppMessage(0x06, int(speed * 127).to_bytes(signed=True) + int(steer * 127).to_bytes(signed=True) + int(yaw * 127).to_bytes(signed=True) + int(roll * 127).to_bytes(signed=True))
+    m2 = MCAppMessage(0x04, m1.build()).build()
     #print("Sending data" +  str(speed) + str(steer))
     #print(int.to_bytes(int(speed * 127), length=1, signed=True))
     #print(int.to_bytes(int(steer * 127), length=1, signed=True))
-    data = (hex(0x04)[2:].rjust(2, '0') + hex(0x06)[2:].rjust(2, '0') + hex(0x06)[2:].rjust(2, '0') + hex(0x04)[2:].rjust(2, '0') + hex(int(speed * 127))[2:].rjust(2, '0') + hex(int(steer * 127))[2:].rjust(2, '0') + hex(int(yaw * 127))[2:].rjust(2, '0') + hex(int(roll * 127))[2:].rjust(2, '0') + '\0').encode('utf-8')
-    print("Data: " + str(data))
-    s.write(data)
+    sender.send(m2, s)
     #print("Data" + str(list(data)))
 
 def setting_send(s) -> None:

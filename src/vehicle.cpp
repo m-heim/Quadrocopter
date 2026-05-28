@@ -89,11 +89,11 @@ void drive(int8_t speed, int8_t steering)
     motor_2_drive(speed_right);
 }
 
-void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
+void setSpeeds(int8_t *buf, bool motorsApply)
 {
     if (motorsApply)
     {
-        drive(p.speed * 0.8, p.roll * 0.45);
+        drive(buf[0] * 0.8, buf[1] * 0.45);
     }
     else
     {
@@ -101,7 +101,7 @@ void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
     }
 }
 
-void startup()
+void startupVehicle()
 {
     motor_1_setup(1);
     motor_2_setup(1);

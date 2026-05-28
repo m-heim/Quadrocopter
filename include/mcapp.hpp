@@ -1,7 +1,6 @@
 #ifndef MCAPP_HPP_
 #define MCAPP_HPP_
 #define MCAPP_VERSION 1
-#define NO_PIN -1
 #include "Arduino.h"
 #include "communication_provider.hpp"
 #include "init.hpp"
@@ -74,30 +73,30 @@ public:
             return false;
         }
         String s = Serial.readStringUntil('\0');
-        if (s.length() < 2) // if we didn't get any data, do nothing (instead of
-                            // applying old data or random data)
+        if (s.length() >= 2) // if we didn't get any data, do nothing (instead of
+                             // applying old data or random data)
         {
+            // Serial.println("Received: " + s);
+            uint8_t buf[PAYLOAD_LENGTH];
+            uint32_t i = 0;
+            while ((i * 2 + 1) < s.length() && i < sizeof(buf))
+            {
+                buf[i] = libmh::getNibble(s.charAt(i * 2)) << 4 | libmh::getNibble(s.charAt((i * 2) + 1));
+                i++;
+            }
+            p.setBuf(buf, i);
+            timer.start();
+            return true;
+        }
+        if (timer.isExpired())
+        {
+            Serial.println("S.U.I.Exp");
             p.invalidate();
-            return false;
         }
-        // Serial.println("Received: " + s);
-        uint8_t buf[PAYLOAD_LENGTH];
-        uint32_t i = 0;
-        while ((i * 2 + 1) < s.length() && i < sizeof(buf))
-        {
-            buf[i] = libmh::getNibble(s.charAt(i * 2)) << 4 | libmh::getNibble(s.charAt((i * 2) + 1));
-            i++;
-        }
-        if (i >= sizeof(buf))
-        {
-            p.invalidate();
-            return false;
-        }
-        p.setBuf(buf, i);
-        return true;
     }
-    bool handleOutput() {
-
+    bool handleOutput()
+    {
+        return false;
     };
     bool isRecent() { return !timer.isExpired(); }
 
@@ -277,11 +276,9 @@ public:
     {
         logger.log(FLASH_STRING("App.N"));
         led.setLed(1);
-        buzzer.buzz(freq, 10);
-        freq += 400;
-        if (freq > 4000)
+        if ((msg_n % 18) == 0)
         {
-            freq = FREQ_BASE;
+            buzzer.buzz(1000, 100);
         }
     }
     int getVersion() { return MCAPP_VERSION; }
@@ -298,11 +295,11 @@ public:
     Led &led;
     VoltageHandler &voltageHandler;
     Message messages[MESSAGES];
+    libmh::ArduinoTimer timer = libmh::ArduinoTimer(NO_MSG);
 
 protected:
     int freq = FREQ_BASE;
     uint8_t msgBuf[PAYLOAD_LENGTH];
-    libmh::ArduinoTimer timer = libmh::ArduinoTimer(NO_MSG);
     int msg_n = 0; // message counter, used for logging and other purposes
 };
 

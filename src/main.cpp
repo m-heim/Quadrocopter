@@ -12,9 +12,9 @@
 #endif
 
 NRF24L01Provider radio = NRF24L01Provider(CE_PIN, CSN_PIN);
-Buzzer buzzer = Buzzer(NO_PIN);
-Led led = Led(NO_PIN);
-VoltageHandler voltageHandler(NO_PIN, 0, 0);
+Buzzer buzzer = Buzzer(BUZZER_PIN);
+Led led = Led(LED_PIN);
+VoltageHandler voltageHandler(VOLTAGE_PIN, VOLTAGE_FACTOR, VOLTAGE);
 ArduinoLogger logger(DEBUG, BAUD);
 // It is very helpful to think of an address as a path instead of as
 // an identifying device destination
@@ -23,6 +23,18 @@ uint8_t radioNumber =
 
 #if SENDER == 0
 MCAppReceiver app(radio, logger, buzzer, led, voltageHandler);
+extern void startupVehicle();
+void startup()
+{
+  app.logger.log(FLASH_STRING("SUP"));
+  startupVehicle();
+  radio.getRadio().openReadingPipe(1, address[0]);
+  radio.getRadio().openWritingPipe(address[1]);
+  radio.getRadio().startListening();
+  delay(100);
+  app.buzzer.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on
+  app.logger.log(FLASH_STRING("SUP 1"));
+}
 #else
 uint8_t defaultBuf[] = {0x04, 0x06, 0x06, 0x04, 0x00, 0x00, 0x00, 0x00};
 uint8_t defaultBufOutput[] = {0x04, 0x02, 0xE2, 0x00};
@@ -83,34 +95,29 @@ void setup()
   app.logger.log(FLASH_STRING("I 1"));
 }
 
+int8_t speedBuf[4];
 void loop()
 {
 #if SENDER == 1
   handleSender();
   delay(SENDER_SLEEP);
-#else
-  bool gyroApply = false;
+#endif
+#if SENDER == 0
   app.led.setLed(0);
-  if (gyro)
-  {
-    a.getEvent(&am, &g, &temp);
-    gyroApply = true;
-  }
   int pkg = app.handle();
-  int8_t *speedBuf = nullptr;
-  int8_t speeds0[4] = {0, 0, 0, 0};
   for (int i = 0; i < pkg; i++)
   {
     if (app.messages[i].getMsg() == CONTROL)
     {
-      speedBuf = (int8_t *)app.messages[i].getData();
+      char buf[32];
+      snprintf(buf, 32, "%d %d %d %d", app.messages[i].getData()[0], app.messages[i].getData()[1], app.messages[i].getData()[2], app.messages[i].getData()[3]);
+      app.logger.log("Received control");
+      app.logger.log(buf);
+      memcpy(speedBuf, app.messages[i].getData(), 4);
+      app.timer.start();
     }
   }
-  if (speedBuf == nullptr)
-  {
-    speedBuf = speeds0;
-  }
-  setSpeeds(speedBuf, app.recentMessage(), gyroApply);
+  setSpeeds(speedBuf, app.recentMessage());
   if (!app.voltageHandler.verifyVoltage())
   {
     app.logger.log(FLASH_STRING("R.V.Low"));

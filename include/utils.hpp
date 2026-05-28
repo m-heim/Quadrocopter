@@ -3,6 +3,7 @@
 #define FREQ_BASE 400
 #define FREQ_DEFAULT 1000
 #define FREQ_HIGH 10000
+#define NO_PIN -1
 
 namespace libmh
 {

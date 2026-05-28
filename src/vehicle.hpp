@@ -16,5 +16,8 @@ void motor_1_setup(int status);
 void motor_2_setup(int status);
 
 void drive(int8_t speed, int8_t steering);
+
+void setSpeeds(int8_t *buf, bool motorsApply);
+
 #endif
 #endif
