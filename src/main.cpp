@@ -25,6 +25,7 @@ uint8_t radioNumber =
 MCAppReceiver app(radio, logger, buzzer, led, voltageHandler);
 #else
 uint8_t defaultBuf[] = {0x04, 0x06, 0x06, 0x04, 0x00, 0x00, 0x00, 0x00};
+uint8_t defaultBufOutput[] = {0x04, 0x02, 0xE2, 0x00};
 
 MCAppSender app(radio, logger, buzzer, led, voltageHandler);
 UartInputHandler uartInputHandler{};

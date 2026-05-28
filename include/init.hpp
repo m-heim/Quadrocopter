@@ -1,12 +1,12 @@
 #ifndef MAIN_HPP
 #define MAIN_HPP
 #include <stdint.h>
-#define SENDER 1
+#define SENDER 0
 #define VEHICLE 0
 #define DEBUG 1
 #define BAUD 115200
-#define RECEIVER_SLEEP 20
-#define SENDER_SLEEP (RECEIVER_SLEEP * 2)
+#define RECEIVER_SLEEP 10
+#define SENDER_SLEEP (RECEIVER_SLEEP * 4)
 #define NO_MSG 0.45
 #define SENDER_INPUT_NO_MSG 0.45
 #define VOLTAGE 11.4

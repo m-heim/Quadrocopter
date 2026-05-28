@@ -14,8 +14,10 @@ typedef enum
   STATUS_POSITION = 0x82,
   STATUS_HEIGHT = 0x83,
   STATUS_VOLTAGE = 0x84,
+  STATUS_EVENT = 0x85,
   ERROR = 0xE0,
-  IDLE = 0xE1
+  IDLE = 0xE1,
+  NO_MESSAGE = 0xE2
 } MessageType;
 
 class Message
@@ -35,7 +37,10 @@ public:
     }
     this->msg = msg;
     this->length = length;
-    memcpy(this->data, data, length);
+    if (length > 0)
+    {
+      memcpy(this->data, data, length);
+    }
   }
   int buildBuf(uint8_t *buf)
   {
@@ -66,12 +71,12 @@ private:
 class MessageHandler
 {
 public:
-  int buildPackage(Message *messages, int count, uint8_t *buf)
+  int buildPackage(Message *messages, int msgs, uint8_t *buf)
   {
     int index = 0;
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < msgs; i++)
     {
-      index += messages[i].buildBuf(buf + index);
+      index += messages[i].buildBuf(buf + 2 + index);
     }
     buf[0] = PACKAGE;
     buf[1] = index;

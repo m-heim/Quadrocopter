@@ -30,7 +30,7 @@ int MCAppReceiver::handle()
         else
         {
         }
-        if ((msg_n % 10) == 0)
+        if ((msg_n % 18) == 0)
         {
             Message voltageMessage;
             float voltage = voltageHandler.getVoltage();
@@ -38,7 +38,10 @@ int MCAppReceiver::handle()
             Message orientationMessage;
             float orientation[2] = {0.0, 0.0};
             orientationMessage.init(STATUS_ORIENTATION, sizeof(orientation), (uint8_t *)orientation);
-            Message msgs[2] = {voltageMessage, orientationMessage};
+            Message eventMessage;
+            uint8_t event[1] = {0};
+            eventMessage.init(STATUS_EVENT, sizeof(event), event);
+            Message msgs[] = {voltageMessage, orientationMessage, eventMessage};
             int payloadLength = messageHandler.buildPackage(msgs, sizeof(msgs) / sizeof(msgs[0]), msgBuf);
             getRemote().disableReceive();
             bool report = remote.write(msgBuf, payloadLength);
@@ -88,6 +91,20 @@ int MCAppSender::handle(InputPayload &p)
         int msgs = messageHandler.parsePackage(o, messages, MESSAGES);
         for (int i = 0; i < msgs; i++)
         {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%d %d %s", messages[i].getMsg(), messages[i].getLength(), messages[i].getData());
+            logger.log(buf);
+            if (messages[i].getMsg() == STATUS_EVENT)
+            {
+                if (!(*messages[i].getData()))
+                {
+                    logger.log(FLASH_STRING("S.R.E 1"));
+                }
+                else
+                {
+                    logger.log(FLASH_STRING("S.R.E 0"));
+                }
+            }
             if (messages[i].getMsg() == STATUS_VOLTAGE)
             {
                 float voltage = *((float *)messages[i].getData());

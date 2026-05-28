@@ -74,13 +74,13 @@ public:
             return false;
         }
         String s = Serial.readStringUntil('\0');
-        Serial.println("Received: " + s);
         if (s.length() < 2) // if we didn't get any data, do nothing (instead of
                             // applying old data or random data)
         {
             p.invalidate();
             return false;
         }
+        // Serial.println("Received: " + s);
         uint8_t buf[PAYLOAD_LENGTH];
         uint32_t i = 0;
         while ((i * 2 + 1) < s.length() && i < sizeof(buf))
@@ -96,6 +96,9 @@ public:
         p.setBuf(buf, i);
         return true;
     }
+    bool handleOutput() {
+
+    };
     bool isRecent() { return !timer.isExpired(); }
 
 private:
