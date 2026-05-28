@@ -40,9 +40,9 @@ bool setAlphaVals();
 
 void setGravity();
 
-void initGyro();
+bool initGyro();
 
-void setAlpha();
+bool setAlpha();
 
 void setGyro();
 

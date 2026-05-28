@@ -6,23 +6,6 @@
 #include "init.hpp"
 #include "utils.hpp"
 
-typedef struct
-{
-    int8_t speeds[4];
-    uint8_t funs[4]; // for future use, can be used for extra features or to send
-                     // more data without changing the structure of the message
-    bool gyroSetup;
-    bool hover;
-} QuadrocopterMessage;
-
-typedef struct
-{
-    uint8_t speeds[4];
-    float orientation[3]; // roll, pitch, yaw or other data depending on the application
-    float position[3];    // x, y, z or other data depending on the application
-    float voltage;
-} SenderPayload;
-
 class InputPayload
 {
 public:

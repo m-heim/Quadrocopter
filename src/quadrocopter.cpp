@@ -1,15 +1,5 @@
 #include <quadrocopter.hpp>
 #if VEHICLE == 0 && SENDER == 0
-void startupVehicle()
-{
-    app.logger.log(FLASH_STRING("PID,GYRO"));
-    initPIDS();
-    initAccelerometer();
-    app.logger.log(FLASH_STRING("MOTORS"));
-    initServos();
-    setServos(1000);
-    app.logger.log(FLASH_STRING("SR"));
-}
 sensors_event_t am, g, temp;
 Adafruit_MPU6050 a;
 int servoPins[SERVOS] = {A0, A1, A2, A3};
@@ -34,6 +24,17 @@ int gyroMsgs = 0;
 bool gyroOn = false;
 bool gravitySet = false;
 bool gyroValid = false;
+
+void startupVehicle()
+{
+    app.logger.log(FLASH_STRING("MOTORS"));
+    initServos();
+    setServos(1000);
+    app.logger.log(FLASH_STRING("PID,GYRO"));
+    initPIDS();
+    initAccelerometer();
+    app.logger.log(FLASH_STRING("SR"));
+}
 
 void initServos()
 {
@@ -112,16 +113,15 @@ void setGravity()
     gravity[1] = 0;
 }
 
-void initGyro()
+bool initGyro()
 {
     bool a1 = a.begin();
     if (a1)
     {
         app.logger.log(F("G 1"));
         a.setGyroRange(MPU6050_RANGE_500_DEG);
-        a.setFilterBandwidth(MPU6050_BAND_184_HZ);
-        a.setSampleRateDivisor(7);
-        delay(100);
+        a.setFilterBandwidth(MPU6050_BAND_5_HZ);
+        a.setSampleRateDivisor(1);
         gyroOn = true;
     }
     else
@@ -129,9 +129,10 @@ void initGyro()
         app.logger.log(F("G 0"));
         gyroOn = false;
     }
+    return gyroOn;
 }
 
-void setAlpha()
+bool setAlpha()
 {
     bool v = setAlphaVals();
     if (v)
@@ -155,6 +156,7 @@ void setAlpha()
             initGyro();
         }
     }
+    return v;
 }
 
 void setGyro()
@@ -173,8 +175,8 @@ void setSpeeds(int8_t sVals[4], bool motorsApply)
 {
     float speeds[4];
     setValues();
-    pitchVal = filters[0].update(pids[0].update(alphaY, sVals[1] / 8.0, 1)) / 1.8;
-    rollVal = filters[1].update(pids[1].update(alphaX, sVals[2] / 8.0, 1)) / 1.8;
+    pitchVal = filters[0].update(pids[0].update(alphaY, sVals[1] / 4.0, 1)) / 1.8;
+    rollVal = filters[1].update(pids[1].update(alphaX, sVals[2] / 4.0, 1)) / 1.8;
     float pp = inRange<float>(pitchVal, -16, 16); // - (yGyro / 4);
     float rr = inRange<float>(rollVal, -16, 16);  // + (xGyro / 4);
     for (int i = 0; i < 4; i++)
@@ -202,50 +204,30 @@ void setSpeeds(int8_t sVals[4], bool motorsApply)
     }
     for (int i = 0; i < 4; i++)
     {
-        int v = 1000;
-        float s = speeds[i];
-        s = s / 127;
-        v += 800 * s;
-        if (v > 1800)
-        {
-            v = 1800;
-        }
-        if (v < 1010)
-        {
-            v = 1010;
-        }
+        int v = 1000 + ((int)(800 * (speeds[i] / 127)));
+        v = inRange<int>(v, 1000, 1800);
         if (!motorsApply)
         {
             v = 1000;
         }
         servos[i].writeMicroseconds(v);
     }
-    char buf[78];
-    snprintf(buf, 40, "%d %d - %d %d - %d %d - %d %d %d %d", (int)(alphaX), (int)(alphaY), (int)(gravity[0]), (int)(gravity[1]), (int)(pitchVal), (int)(rollVal), (int)speeds[0], (int)speeds[1], (int)speeds[2], (int)speeds[3]);
+    char buf[45];
+    snprintf(buf, sizeof(buf), "%d %d - %d %d - %d %d - %d %d %d %d", (int)(alphaX), (int)(alphaY), (int)(gravity[0]), (int)(gravity[1]), (int)(pitchVal), (int)(rollVal), (int)speeds[0], (int)speeds[1], (int)speeds[2], (int)speeds[3]);
     app.logger.log(buf);
 }
 
-void printVoltage()
-{
-    if (Serial)
-    {
-        Serial.print("Voltage: ");
-        Serial.print((int)app.voltageHandler.getVoltage(), DEC);
-        Serial.print("V");
-        Serial.print("\n");
-    }
-}
 void initAccelerometer()
 {
     int i = 0;
     while (i < 10)
     {
-        initGyro();
-        if (gyroOn)
+        if (initGyro())
         {
             setGravity();
             return;
         }
+        delay(10);
     }
 }
 

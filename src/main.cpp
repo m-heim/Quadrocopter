@@ -21,6 +21,7 @@ ArduinoLogger logger(DEBUG, BAUD);
 uint8_t radioNumber =
     SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
 
+void startup();
 #if SENDER == 0
 MCAppReceiver app(radio, logger, buzzer, led, voltageHandler);
 extern void startupVehicle();
@@ -36,15 +37,15 @@ void startup()
   app.logger.log(FLASH_STRING("SUP 1"));
 }
 #else
-uint8_t defaultBuf[] = {0x04, 0x06, 0x06, 0x04, 0x00, 0x00, 0x00, 0x00};
-uint8_t defaultBufOutput[] = {0x04, 0x02, 0xE2, 0x00};
+uint8_t defaultBuf[] = {PACKAGE, 0x06, CONTROL, 0x04, 0x00, 0x00, 0x00, 0x00};
+uint8_t defaultBufOutput[] = {PACKAGE, 0x02, STATUS_EVENT, 0x00};
 
 MCAppSender app(radio, logger, buzzer, led, voltageHandler);
 UartInputHandler uartInputHandler{};
 
 InputPayload inputPayload = InputPayload((uint8_t *)defaultBuf, sizeof(defaultBuf));
 
-void startupSender()
+void startup()
 {
   radio.getRadio().openWritingPipe(address[0]);
   radio.getRadio().openReadingPipe(1, address[1]);
@@ -86,12 +87,7 @@ void setup()
   {
     app.logger.log(FLASH_STRING("I.RF24 1"));
   }
-#if SENDER == 0
   startup();
-#endif
-#if SENDER == 1
-  startupSender();
-#endif
   app.logger.log(FLASH_STRING("I 1"));
 }
 

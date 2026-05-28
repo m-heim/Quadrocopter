@@ -14,7 +14,7 @@ public:
     {
         error = val - set;
         error_derivative = error - prev_err;
-        if (!useIntegralRange || (val > integralRange1 && val < integralRange2))
+        if (!useIntegralRange || (((error_sum + error) * ki) > integralRange1 && ((error_sum + error) * ki) < integralRange2))
         {
             error_sum += error;
         }
@@ -64,7 +64,8 @@ public:
         val = (factor * value) + ((1 - factor) * val);
         return getValue();
     }
-    T getValue() {
+    T getValue()
+    {
         return val;
     }
 
