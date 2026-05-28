@@ -1,5 +1,7 @@
 #ifndef VEHICLE_HPP
 #define VEHICLE_HPP
+#include "init.hpp"
+#if VEHICLE == 1 && SENDER == 0
 #define MOTOR_1_EN_L 2
 #define MOTOR_1_EN_R 4
 #define MOTOR_1_PWM_L 5
@@ -14,4 +16,5 @@ void motor_1_setup(int status);
 void motor_2_setup(int status);
 
 void drive(int8_t speed, int8_t steering);
+#endif
 #endif

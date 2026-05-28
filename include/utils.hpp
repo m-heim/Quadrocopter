@@ -24,47 +24,50 @@ namespace libmh
   class Timer
   {
   public:
-    Timer(float expiry, float (*fun)()) : expiry(expiry), fun(fun) { lastTime = fun() - expiry; }
+    Timer(float expiry, float (*fun)()) : expiry(expiry), fun(fun)
+    {
+      lastTime = this->fun() - expiry;
+    }
 
     void start() { lastTime = fun(); }
     bool isExpired() { return (fun() - lastTime) >= expiry; }
 
   protected:
+    float expiry;
     float (*fun)();
     float lastTime;
-    float expiry;
   };
-}; // namespace libmh
-
-class ArduinoTimer : public libmh::Timer
-{
-public:
-  ArduinoTimer(float expiry) : libmh::Timer(expiry, fun) {}
-  static float fun()
+  inline float fun1()
   {
     return millis() / 1000.0;
   }
-};
 
-uint8_t getNibble(uint8_t v)
-{
-  if (v >= '0' && v <= '9')
+  class ArduinoTimer : public libmh::Timer
   {
-    return v - '0';
-  }
-  else if (v >= 'A' && v <= 'F')
+  public:
+    ArduinoTimer(float expiry) : libmh::Timer(expiry, fun1) {}
+  };
+
+  inline uint8_t getNibble(uint8_t v)
   {
-    return v - 'A' + 10;
+    if (v >= '0' && v <= '9')
+    {
+      return v - '0';
+    }
+    else if (v >= 'A' && v <= 'F')
+    {
+      return v - 'A' + 10;
+    }
+    else if (v >= 'a' && v <= 'f')
+    {
+      return v - 'a' + 10;
+    }
+    else
+    {
+      return 0;
+    }
   }
-  else if (v >= 'a' && v <= 'f')
-  {
-    return v - 'a' + 10;
-  }
-  else
-  {
-    return 0;
-  }
-}
+};
 
 #ifdef ARDUINO
 #define FLASH_STRING(x) (F(x))

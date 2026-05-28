@@ -5,11 +5,11 @@ int MCAppReceiver::handle()
 {
     msg_n += 1;
     int msgs = -1;
-    int l = remote->read();
+    int l = remote.read();
     if (l > 0)
     { // is there a payload? get the pipe number that recieved it
-        uint8_t *o = remote->getBuf();
-        logger->log("Receiver.Received");
+        uint8_t *o = remote.getBuf();
+        logger.log("R.R");
         if (o[0] == PACKAGE)
         {
             msgs = messageHandler.parsePackage(o, messages, MESSAGES);
@@ -17,11 +17,11 @@ int MCAppReceiver::handle()
             {
                 timer.start();
             }
-            logger->log("Receiver.Received 1");
+            logger.log("R.R 1");
         }
         else
         {
-            logger->log("Receiver.Received Err");
+            logger.log("R.R Err");
         }
         if (timer.isExpired())
         {
@@ -33,66 +33,66 @@ int MCAppReceiver::handle()
         if ((msg_n % 10) == 0)
         {
             Message voltageMessage;
-            float voltage = voltageHandler->getVoltage();
+            float voltage = voltageHandler.getVoltage();
             voltageMessage.init(STATUS_VOLTAGE, sizeof(float), (uint8_t *)&voltage);
             Message orientationMessage;
             float orientation[2] = {0.0, 0.0};
             orientationMessage.init(STATUS_ORIENTATION, sizeof(orientation), (uint8_t *)orientation);
             Message msgs[2] = {voltageMessage, orientationMessage};
             int payloadLength = messageHandler.buildPackage(msgs, sizeof(msgs) / sizeof(msgs[0]), msgBuf);
-            getRemote()->disableReceive();
-            bool report = remote->write(msgBuf, payloadLength);
-            getRemote()->enableReceive();
+            getRemote().disableReceive();
+            bool report = remote.write(msgBuf, payloadLength);
+            getRemote().enableReceive();
             if (report)
             {
-                logger->log("Receiver.Send 1");
+                logger.log("R.S 1");
             }
             else
             {
-                logger->log("Receiver.Send 0");
+                logger.log("R.S 0");
             }
         }
     }
     else
     {
-        logger->log("Receiver.Received 0");
+        logger.log("R.R 0");
     }
     return msgs;
 }
 
 int MCAppSender::handle(InputPayload &p)
 {
-    logger->log(FLASH_STRING("Sender.Handle"));
+    logger.log(FLASH_STRING("S.H"));
     msg_n += 1;
-    getRemote()->disableReceive();
-    bool report = getRemote()->write(p.getBuf(), p.getLen());
-    getRemote()->enableReceive();
+    getRemote().disableReceive();
+    bool report = getRemote().write(p.getBuf(), p.getLen());
+    getRemote().enableReceive();
     if (report)
     {
-        logger->log(FLASH_STRING("S.S 1"));
+        logger.log(FLASH_STRING("S.S 1"));
         timer.start();
     }
     else
     {
-        logger->log(FLASH_STRING("S.S 0"));
+        logger.log(FLASH_STRING("S.S 0"));
     }
     if (timer.isExpired())
     {
         noPackageAction();
-        logger->log(FLASH_STRING("S.S.Err 1"));
+        logger.log(FLASH_STRING("S.S.Err 1"));
     }
-    if (getRemote()->read() > 0)
+    if (getRemote().read() > 0)
     { // is there a payload? get the pipe number that recieved it
-        logger->log(FLASH_STRING("S.R 1"));
-        uint8_t *o = getRemote()->getBuf();
+        logger.log(FLASH_STRING("S.R 1"));
+        uint8_t *o = getRemote().getBuf();
         int msgs = messageHandler.parsePackage(o, messages, MESSAGES);
         for (int i = 0; i < msgs; i++)
         {
             if (messages[i].getMsg() == STATUS_VOLTAGE)
             {
                 float voltage = *((float *)messages[i].getData());
-                logger->log(FLASH_STRING("S.R.Voltage:"));
-                logger->log(String(voltage).c_str());
+                logger.log(FLASH_STRING("S.R.V:"));
+                logger.log(String(voltage).c_str());
             }
             /*else if (messages[i].getMsg() == STATUS_SPEEDS)
             {
@@ -139,7 +139,7 @@ int MCAppSender::handle(InputPayload &p)
     }
     else
     {
-        logger->log(FLASH_STRING("S.R 0"));
+        logger.log(FLASH_STRING("S.R 0"));
     }
     return report;
 }

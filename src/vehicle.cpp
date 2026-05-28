@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "vehicle.hpp"
 #include "mcapp.hpp"
-#if VEHICLE == 1
+#if VEHICLE == 1 && SENDER == 0
 
 void motor_1_drive(int8_t speed)
 {
@@ -89,17 +89,22 @@ void drive(int8_t speed, int8_t steering)
     motor_2_drive(speed_right);
 }
 
-void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply) {
-  if (motorsApply) {
-    drive(p.speed * 0.8, p.roll * 0.45);
-  } else {
-    drive(0, 0);
-  }
+void setSpeeds(ReceiverPayload p, bool motorsApply, bool gyroApply)
+{
+    if (motorsApply)
+    {
+        drive(p.speed * 0.8, p.roll * 0.45);
+    }
+    else
+    {
+        drive(0, 0);
+    }
 }
 
-void startup() {
-  motor_1_setup(1);
-  motor_2_setup(1);
+void startup()
+{
+    motor_1_setup(1);
+    motor_2_setup(1);
 }
 
 #endif

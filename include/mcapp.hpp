@@ -74,18 +74,19 @@ public:
             return false;
         }
         String s = Serial.readStringUntil('\0');
-        // Serial.println("Received: " + s);
-        if (s.length() < 1) // if we didn't get any data, do nothing (instead of
+        Serial.println("Received: " + s);
+        if (s.length() < 2) // if we didn't get any data, do nothing (instead of
                             // applying old data or random data)
         {
             p.invalidate();
             return false;
         }
         uint8_t buf[PAYLOAD_LENGTH];
-        int i = 0;
+        uint32_t i = 0;
         while ((i * 2 + 1) < s.length() && i < sizeof(buf))
         {
-            buf[i] = getNibble(s.charAt(i * 2)) << 4 | getNibble(s.charAt((i * 2) + 1));
+            buf[i] = libmh::getNibble(s.charAt(i * 2)) << 4 | libmh::getNibble(s.charAt((i * 2) + 1));
+            i++;
         }
         if (i >= sizeof(buf))
         {
@@ -98,7 +99,7 @@ public:
     bool isRecent() { return !timer.isExpired(); }
 
 private:
-    ArduinoTimer timer = ArduinoTimer(SENDER_INPUT_NO_MSG);
+    libmh::ArduinoTimer timer = libmh::ArduinoTimer(SENDER_INPUT_NO_MSG);
 };
 
 class Logger
@@ -115,12 +116,15 @@ protected:
 class ArduinoLogger : public Logger
 {
 public:
-    ArduinoLogger(bool enabled, uint32_t baud) : Logger(enabled)
+    ArduinoLogger(bool enabled, unsigned long baud) : Logger(enabled), baud(baud)
+    {
+    }
+    void init()
     {
         if (enabled && Serial)
         {
             Serial.begin(baud);
-            // Serial.println("AL.I 1");
+            Serial.println("AL.I 1");
         }
     }
     void log(const char *msg) override
@@ -137,6 +141,9 @@ public:
             Serial.println(msg);
         }
     }
+
+private:
+    unsigned long baud;
 };
 
 class Buzzer
@@ -151,6 +158,10 @@ public:
     }
     void output(int start, int stop, int step, float seconds)
     {
+        if (pin == NO_PIN)
+        {
+            return;
+        }
         int s = (int)((seconds / 1000));
         for (int i = start; i <= stop; i += step)
         {
@@ -249,19 +260,21 @@ private:
 class MCApp
 {
 public:
-    MCApp(CommunicationProvider *remote, Logger *logger, Buzzer *buzzer, Led *led, VoltageHandler *voltageHandler) : remote(remote), logger(logger), buzzer(buzzer), led(led), voltageHandler(voltageHandler)
+    MCApp(CommunicationProvider &remote, Logger &logger, Buzzer &buzzer, Led &led, VoltageHandler &voltageHandler) : remote(remote), logger(logger), buzzer(buzzer), led(led), voltageHandler(voltageHandler)
     {
+        // delay(1000);
         pinMode(LED_BUILTIN, OUTPUT);
+        // logger.log("A.I 1");
     }
-    CommunicationProvider *getRemote() { return this->remote; }
+    CommunicationProvider &getRemote() { return remote; }
 
     bool recentMessage() { return !timer.isExpired(); }
 
     void noPackageAction()
     {
-        logger->log(FLASH_STRING("App.N"));
-        led->setLed(1);
-        buzzer->buzz(freq, 10);
+        logger.log(FLASH_STRING("App.N"));
+        led.setLed(1);
+        buzzer.buzz(freq, 10);
         freq += 400;
         if (freq > 4000)
         {
@@ -275,32 +288,32 @@ public:
         {
         }
     }
-    CommunicationProvider *remote;
-    Logger *logger;
-    Buzzer *buzzer;
+    CommunicationProvider &remote;
+    Logger &logger;
+    Buzzer &buzzer;
     MessageHandler messageHandler;
-    VoltageHandler *voltageHandler;
-    Led *led;
+    Led &led;
+    VoltageHandler &voltageHandler;
     Message messages[MESSAGES];
 
 protected:
     int freq = FREQ_BASE;
     uint8_t msgBuf[PAYLOAD_LENGTH];
-    ArduinoTimer timer = ArduinoTimer(NO_MSG);
+    libmh::ArduinoTimer timer = libmh::ArduinoTimer(NO_MSG);
     int msg_n = 0; // message counter, used for logging and other purposes
 };
 
 class MCAppReceiver : public MCApp
 {
 public:
-    MCAppReceiver(CommunicationProvider *remote, Logger *logger, Buzzer *buzzer, Led *led, VoltageHandler *voltageHandler) : MCApp(remote, logger, buzzer, led, voltageHandler) {}
+    MCAppReceiver(CommunicationProvider &remote, Logger &logger, Buzzer &buzzer, Led &led, VoltageHandler &voltageHandler) : MCApp(remote, logger, buzzer, led, voltageHandler) {}
     int handle();
 };
 
 class MCAppSender : public MCApp
 {
 public:
-    MCAppSender(CommunicationProvider *remote, Logger *logger, Buzzer *buzzer, Led *led, VoltageHandler *voltageHandler) : MCApp(remote, logger, buzzer, led, voltageHandler) {}
+    MCAppSender(CommunicationProvider &remote, Logger &logger, Buzzer &buzzer, Led &led, VoltageHandler &voltageHandler) : MCApp(remote, logger, buzzer, led, voltageHandler) {}
     int handle(InputPayload &p);
 };
 #endif

@@ -11,6 +11,7 @@
 #define SENDER_INPUT_NO_MSG 0.45
 #define VOLTAGE 11.4
 #define MESSAGES 10
+#define PAYLOAD_LENGTH 35
 
 #if SENDER == 1
 #define CE_PIN 7

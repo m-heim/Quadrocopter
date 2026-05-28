@@ -1,7 +1,7 @@
 
 #ifndef COMMUNICATION_PROVIDER_HPP_
 #define COMMUNICATION_PROVIDER_HPP_
-#define PAYLOAD_LENGTH 35
+#include "init.hpp"
 
 typedef enum
 {

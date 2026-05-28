@@ -1,3 +1,5 @@
+#ifndef QUADROCOPTER_HPP__
+#define QUADROCOPTER_HPP__
 #include "mcapp.hpp"
 #include "servo.h"
 #include "nrf24l01_provider.hpp"
@@ -26,7 +28,7 @@
 #define LP (1 - 0.45)
 
 extern NRF24L01Provider radio;
-extern MCApp app;
+extern MCAppReceiver app;
 sensors_event_t am, g, temp;
 Adafruit_MPU6050 a;
 int servoPins[SERVOS] = {A0, A1, A2, A3};
@@ -72,7 +74,7 @@ void setMotors()
 
 void setGravity()
 {
-  app.log("Setting gravity");
+  app.logger.log("Setting gravity");
   if (gyro)
   {
     long m = millis();
@@ -106,7 +108,7 @@ void setGravity()
       }
     }
   }
-  app.log("Setting gravity ok");
+  app.logger.log("Setting gravity ok");
 }
 
 void initGyro()
@@ -114,7 +116,7 @@ void initGyro()
   bool a1 = a.begin();
   if (a1)
   {
-    app.log(F("G 1"));
+    app.logger.log(F("G 1"));
     a.setGyroRange(MPU6050_RANGE_500_DEG);
     a.setFilterBandwidth(MPU6050_BAND_184_HZ);
     a.setSampleRateDivisor(7);
@@ -124,7 +126,7 @@ void initGyro()
   }
   else
   {
-    app.log(F("G 0"));
+    app.logger.log(F("G 0"));
   }
 }
 
@@ -141,7 +143,7 @@ void setAlpha()
   alphaY = (LP * alphaY) + ((1 - LP) * alphaY1);
   if (isnan(alphaX) || isnan(alphaY))
   {
-    app.log("Nan");
+    app.logger.log("Nan");
     alphaX = 0;
     alphaY = 0;
     if (index == 18)
@@ -178,7 +180,7 @@ void setSpeeds(int8_t sVals[4], bool motorsApply, bool gyroApply)
   float rr = inRange<float>(rollVal, -16, 16);  // + (xGyro / 4);
   for (int i = 0; i < 4; i++)
   {
-    speeds[i] = speeds[i];
+    speeds[i] = sVals[i];
     if (gyroApply)
     {
       if (i & BACK)
@@ -219,9 +221,9 @@ void setSpeeds(int8_t sVals[4], bool motorsApply, bool gyroApply)
     }
     servos[i].writeMicroseconds(v);
   }
-  char buf[40];
-  snprintf(buf, 40, "%d %d %d %d %d %d %d %d %d %d", (int)(alphaX * 1000), (int)(alphaY * 1000), (int)(gravity[0] * 1000), (int)(gravity[1] * 1000), (int)(pitchVal * 1000), (int)(rollVal * 1000), (int)speeds[0], (int)speeds[1], (int)speeds[2], (int)speeds[3]);
-  app.log(buf);
+  char buf[78];
+  snprintf(buf, 40, "%d %d - %d %d - %d %d - %d %d %d %d", (int)(alphaX), (int)(alphaY), (int)(gravity[0]), (int)(gravity[1]), (int)(pitchVal), (int)(rollVal), (int)speeds[0], (int)speeds[1], (int)speeds[2], (int)speeds[3]);
+  app.logger.log(buf);
 }
 
 void printVoltage()
@@ -229,7 +231,7 @@ void printVoltage()
   if (Serial)
   {
     Serial.print("Voltage: ");
-    Serial.print((int)app.getVoltage(), DEC);
+    Serial.print((int)app.voltageHandler.getVoltage(), DEC);
     Serial.print("V");
     Serial.print("\n");
   }
@@ -238,14 +240,14 @@ void initAccelerometer()
 {
   for (int i = 0; i < 10; i++)
   {
-    app.log("I1");
+    app.logger.log("I1");
     bool a1 = a.begin();
     delay(100);
-    app.log("I1");
+    app.logger.log("I1");
     if (a1)
     {
       delay(10);
-      app.log("OM 1");
+      app.logger.log("OM 1");
       delay(10);
       a.setGyroRange(MPU6050_RANGE_500_DEG);
       a.setFilterBandwidth(MPU6050_BAND_5_HZ);
@@ -257,7 +259,7 @@ void initAccelerometer()
     }
     if (i == 9)
     {
-      app.log("OM 0");
+      app.logger.log("OM 0");
     }
     delay(10);
   }
@@ -274,22 +276,19 @@ void initPIDS()
 
 void startup()
 {
-  app.log("1");
-  app.initLed(LED);
-  app.initPiezo(PIEZO);
-  app.initVoltage(INVOLTAGE, 3, 8);
-  app.log("PID,GYRO");
+  app.logger.log("PID,GYRO");
   initPIDS();
   initAccelerometer();
-  app.log("MOTORS");
+  app.logger.log("MOTORS");
   initServos();
   setServos(1000);
-  app.log("Setting up radio for receiver");
+  app.logger.log("Setting up radio for receiver");
   radio.getRadio().openReadingPipe(1, address[0]);
   radio.getRadio().openWritingPipe(address[1]);
-  radio.getRadio().stopListening();
-  app.log("Radio setup for receiver");
+  radio.getRadio().startListening();
+  app.logger.log("Radio setup for receiver");
   delay(100);
-  app.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on
+  app.buzzer.output(1000, 1300, 100, 0.04); // buzz on startup to indicate it is on
 }
+#endif
 #endif
