@@ -5,7 +5,7 @@
 #define SENDER 0
 #define VEHICLE 0
 #define DEBUG 0
-#define BAUD 115200
+#define BAUD 9600
 #define RECEIVER_SLEEP 10
 #define SENDER_SLEEP (RECEIVER_SLEEP * 4)
 #define NO_MSG 0.45

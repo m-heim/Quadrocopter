@@ -7,15 +7,24 @@ import serial
 
 
 DEBUG = True
-JOYSTICK_NUM = 0
-SPEED_AXIS = 1
-STEER_AXIS = 3
-YAW_AXIS = 0
-ROLL_AXIS = 4
-BRAKE_BUTTON = 4
-AXIS_BUTTON = 5
-SETTING_BUTTON = 3
-
+if sys.platform == "win32":
+    JOYSTICK_NUM = 0
+    SPEED_AXIS = 1
+    STEER_AXIS = 3
+    YAW_AXIS = 0
+    ROLL_AXIS = 2
+    BRAKE_BUTTON = 4
+    AXIS_BUTTON = 5
+    SETTING_BUTTON = 3
+elif sys.platform == "linux":
+    JOYSTICK_NUM = 0
+    SPEED_AXIS = 1
+    STEER_AXIS = 3
+    YAW_AXIS = 0
+    ROLL_AXIS = 4
+    BRAKE_BUTTON = 4
+    AXIS_BUTTON = 5
+    SETTING_BUTTON = 3
 class MCAppMessage:
     def __init__(self, msg: int, msgBuf):
         self.msg = msg
@@ -71,11 +80,11 @@ def joystick_setup() -> list[pygame.joystick.Joystick]:
     return joysticks
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python data.py <serial_port>")
+    if len(sys.argv) != 3:
+        print("Usage: python data.py <serial_port> <baud>")
         sys.exit(1)
 
-    with serial.Serial(sys.argv[1], 115200, timeout=10) as s:
+    with serial.Serial(sys.argv[1], sys.argv[2], timeout=10) as s:
         joysticks = joystick_setup()
         print(f'Found {pygame.joystick.get_count()} joysticks on ports')
         while True:

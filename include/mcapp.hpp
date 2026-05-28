@@ -61,7 +61,7 @@ public:
     {
         if (Serial)
         {
-            // Serial.begin(115200);
+            Serial.begin(BAUD);
             Serial.setTimeout(10);
         }
     }

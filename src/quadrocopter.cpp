@@ -1,5 +1,5 @@
 #include <quadrocopter.hpp>
-#if VEHICLE == 0
+#if VEHICLE == 0 && SENDER == 0
 void startupVehicle()
 {
     app.logger.log(FLASH_STRING("PID,GYRO"));
@@ -72,8 +72,8 @@ bool setAlphaVals()
         gyroValid = false;
         return false;
     }
-    alphaXVal = atan((yAcc) / sqrt(pow((xAcc), 2) + pow((zAcc), 2))) * 57.29577951308232;
-    alphaYVal = atan(-1 * (xAcc) / sqrt(pow((yAcc), 2) + pow((zAcc), 2))) * 57.29577951308232;
+    alphaYVal = atan((yAcc) / sqrt(pow((xAcc), 2) + pow((zAcc), 2))) * 57.29577951308232;
+    alphaXVal = atan(-1 * (xAcc) / sqrt(pow((yAcc), 2) + pow((zAcc), 2))) * 57.29577951308232;
     gyroValid = true;
     return true;
 }
@@ -92,8 +92,8 @@ void setGravity()
         while ((millis() - m) < GRAVITY)
         {
             setAlphaVals();
-            gravity[0] += alphaX;
-            gravity[1] += alphaY;
+            gravity[0] += alphaXVal;
+            gravity[1] += alphaYVal;
             vals += 1;
         }
         if (vals >= 1)
@@ -173,8 +173,8 @@ void setSpeeds(int8_t sVals[4], bool motorsApply)
 {
     float speeds[4];
     setValues();
-    pitchVal = filters[0].update(pids[0].update(alphaY, sVals[1] / 4.0, 1));
-    rollVal = filters[1].update(pids[1].update(alphaX, sVals[2] / 4.0, 1));
+    pitchVal = filters[0].update(pids[0].update(alphaY, sVals[1] / 8.0, 1)) / 1.8;
+    rollVal = filters[1].update(pids[1].update(alphaX, sVals[2] / 8.0, 1)) / 1.8;
     float pp = inRange<float>(pitchVal, -16, 16); // - (yGyro / 4);
     float rr = inRange<float>(rollVal, -16, 16);  // + (xGyro / 4);
     for (int i = 0; i < 4; i++)
@@ -210,9 +210,9 @@ void setSpeeds(int8_t sVals[4], bool motorsApply)
         {
             v = 1800;
         }
-        if (v < 1000)
+        if (v < 1010)
         {
-            v = 1000;
+            v = 1010;
         }
         if (!motorsApply)
         {
@@ -253,12 +253,12 @@ void initPIDS()
 {
     for (int i = 0; i < PIDS; i++)
     {
-        pids[i] = PID<float>(0.18, 0.0, 0.18, -4, 4);
+        pids[i] = PID<float>(0.04, 0.0, 0.01, -1.8, 1.8);
         filters[i] = Filter<float>(0.18);
     }
     for (int i = 0; i < 2; i++)
     {
-        filters2[i] = Filter<float>(LP);
+        filters2[i] = Filter<float>(0.04);
     }
 }
 #endif
