@@ -40,7 +40,12 @@ void initServos()
 {
     for (int i = 0; i < 4; i++)
     {
-        servos[i].attach(servoPins[i]);
+        if (servos[i].attach(servoPins[i]) == INVALID_SERVO)
+        {
+            while (1)
+            {
+            }
+        }
     }
 }
 
@@ -126,7 +131,7 @@ bool initGyro()
     }
     else
     {
-        app.logger.log(F("G 0"));
+        app.logger.log(FLASH_STRING("G 0"));
         gyroOn = false;
     }
     return gyroOn;
@@ -142,12 +147,12 @@ bool setAlpha()
             alphaXVal -= gravity[0];
             alphaYVal -= gravity[1];
         }
-        alphaX = filters[0].update(alphaXVal);
-        alphaY = filters[1].update(alphaYVal);
+        alphaX = filters2[0].update(alphaXVal);
+        alphaY = filters2[1].update(alphaYVal);
     }
     else
     {
-        app.logger.log("Nan");
+        app.logger.log(FLASH_STRING("Nan"));
         gyroMsgs += 1;
         alphaX = 0;
         alphaY = 0;
@@ -175,8 +180,8 @@ void setSpeeds(int8_t sVals[4], bool motorsApply)
 {
     float speeds[4];
     setValues();
-    pitchVal = filters[0].update(pids[0].update(alphaY, sVals[1] / 4.0, 1)) / 1.8;
-    rollVal = filters[1].update(pids[1].update(alphaX, sVals[2] / 4.0, 1)) / 1.8;
+    pitchVal = filters[0].update(pids[0].update(alphaX / 4.5, sVals[1] / 18, 1));
+    rollVal = filters[1].update(pids[1].update(alphaY / 4.5, sVals[2] / 18, 1));
     float pp = inRange<float>(pitchVal, -16, 16); // - (yGyro / 4);
     float rr = inRange<float>(rollVal, -16, 16);  // + (xGyro / 4);
     for (int i = 0; i < 4; i++)
@@ -235,12 +240,12 @@ void initPIDS()
 {
     for (int i = 0; i < PIDS; i++)
     {
-        pids[i] = PID<float>(0.04, 0.0, 0.01, -1.8, 1.8);
+        pids[i] = PID<float>(1, 0.0, 0.1, -1.8, 1.8);
         filters[i] = Filter<float>(0.18);
     }
     for (int i = 0; i < 2; i++)
     {
-        filters2[i] = Filter<float>(0.04);
+        filters2[i] = Filter<float>(0.045);
     }
 }
 #endif

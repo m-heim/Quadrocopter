@@ -6,6 +6,8 @@
 #include "init.hpp"
 #include "utils.hpp"
 
+extern libmh::TimeProvider<float> &prov;
+
 class InputPayload
 {
 public:
@@ -35,6 +37,7 @@ private:
 
 class InputHandler
 {
+public:
     virtual bool handle(InputPayload &p) = 0;
 };
 class UartInputHandler : public InputHandler
@@ -48,7 +51,7 @@ public:
             Serial.setTimeout(10);
         }
     }
-    bool handle(InputPayload &p) override
+    bool handle(InputPayload &p)
     {
         if (!Serial)
         {
@@ -67,6 +70,11 @@ public:
                 buf[i] = libmh::getNibble(s.charAt(i * 2)) << 4 | libmh::getNibble(s.charAt((i * 2) + 1));
                 i++;
             }
+            if (i <= 2 || buf[0] != PACKAGE)
+            {
+                p.invalidate();
+                return false;
+            }
             p.setBuf(buf, i);
             timer.start();
             return true;
@@ -75,7 +83,9 @@ public:
         {
             Serial.println("S.U.I.Exp");
             p.invalidate();
+            return false;
         }
+        return true;
     }
     bool handleOutput()
     {
@@ -84,7 +94,7 @@ public:
     bool isRecent() { return !timer.isExpired(); }
 
 private:
-    libmh::ArduinoTimer timer = libmh::ArduinoTimer(SENDER_INPUT_NO_MSG);
+    libmh::ExpiryTimer<float> timer = libmh::ExpiryTimer<float>(prov, SENDER_INPUT_NO_MSG);
 };
 
 class Logger
@@ -259,8 +269,9 @@ public:
     {
         logger.log(FLASH_STRING("App.N"));
         led.setLed(1);
-        if ((msg_n % 18) == 0)
+        if (beepTimer.isExpired())
         {
+            beepTimer.start();
             buzzer.buzz(1000, 100);
         }
     }
@@ -278,7 +289,8 @@ public:
     Led &led;
     VoltageHandler &voltageHandler;
     Message messages[MESSAGES];
-    libmh::ArduinoTimer timer = libmh::ArduinoTimer(NO_MSG);
+    libmh::ExpiryTimer<float> timer = libmh::ExpiryTimer<float>(prov, NO_MSG);
+    libmh::IntervalTimer<float> beepTimer = libmh::IntervalTimer<float>(prov, 1);
 
 protected:
     int freq = FREQ_BASE;

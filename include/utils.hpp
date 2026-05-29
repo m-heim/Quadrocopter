@@ -22,31 +22,71 @@ namespace libmh
     virtual void subscribe(Subscriber<MessageType> &sub) = 0;
   };
 
-  class Timer
+  template <typename T>
+  class TimeProvider
   {
   public:
-    Timer(float expiry, float (*fun)()) : expiry(expiry), fun(fun)
+    TimeProvider() {}
+    virtual T getTime() = 0;
+  };
+
+  class ArduinoTimeProvider : public TimeProvider<float>
+  {
+  public:
+    ArduinoTimeProvider() {}
+    float getTime()
     {
-      lastTime = this->fun() - expiry;
+      return millis() / 1000.0;
+    }
+  };
+
+  template <typename T>
+  class ExpiryTimer
+  {
+  public:
+    ExpiryTimer(TimeProvider<T> &p, T expiry) : p(p), expiry(expiry)
+    {
+      lastTime = p.getTime() - expiry;
     }
 
-    void start() { lastTime = fun(); }
-    bool isExpired() { return (fun() - lastTime) >= expiry; }
+    void start() { lastTime = p.getTime(); }
+    bool isExpired() { return (p.getTime() - lastTime) >= expiry; }
 
   protected:
-    float expiry;
-    float (*fun)();
-    float lastTime;
+    TimeProvider<T> &p;
+    T expiry;
+    T lastTime;
   };
-  inline float fun1()
-  {
-    return millis() / 1000.0;
-  }
 
-  class ArduinoTimer : public libmh::Timer
+  template <typename T>
+  class IntervalTimer
   {
   public:
-    ArduinoTimer(float expiry) : libmh::Timer(expiry, fun1) {}
+    IntervalTimer(TimeProvider<T> &p, T interval) : p(p), interval(interval)
+    {
+      start();
+    }
+    void start() { lastTime = p.getTime(); }
+    void set()
+    {
+      int base = (p.getTime() - lastTime) / interval;
+      if (!base)
+      {
+        return;
+      }
+      lastTime = lastTime + (base * interval);
+    }
+    bool isExpired()
+    {
+      bool i = (p.getTime() - lastTime) >= interval;
+      set();
+      return i;
+    }
+
+  private:
+    TimeProvider<T> &p;
+    T interval;
+    T lastTime;
   };
 
   inline uint8_t getNibble(uint8_t v)

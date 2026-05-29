@@ -11,8 +11,8 @@ if sys.platform == "win32":
     JOYSTICK_NUM = 0
     SPEED_AXIS = 1
     STEER_AXIS = 3
-    YAW_AXIS = 0
-    ROLL_AXIS = 2
+    YAW_AXIS = 2
+    ROLL_AXIS = 0
     BRAKE_BUTTON = 4
     AXIS_BUTTON = 5
     SETTING_BUTTON = 3
@@ -20,8 +20,8 @@ elif sys.platform == "linux":
     JOYSTICK_NUM = 0
     SPEED_AXIS = 1
     STEER_AXIS = 3
-    YAW_AXIS = 0
-    ROLL_AXIS = 4
+    YAW_AXIS = 4
+    ROLL_AXIS = 0
     BRAKE_BUTTON = 4
     AXIS_BUTTON = 5
     SETTING_BUTTON = 3
@@ -89,9 +89,9 @@ def main():
         print(f'Found {pygame.joystick.get_count()} joysticks on ports')
         while True:
             pygame.event.pump()
-            steer = -joystick_read_axis(joysticks[JOYSTICK_NUM], STEER_AXIS)
-            yaw = joystick_read_axis(joysticks[JOYSTICK_NUM], YAW_AXIS)
-            roll = joystick_read_axis(joysticks[JOYSTICK_NUM], ROLL_AXIS)
+            steer = joystick_read_axis(joysticks[JOYSTICK_NUM], STEER_AXIS)
+            yaw = - joystick_read_axis(joysticks[JOYSTICK_NUM], YAW_AXIS)
+            roll = - joystick_read_axis(joysticks[JOYSTICK_NUM], ROLL_AXIS)
             brake = joystick_read_button(joysticks[JOYSTICK_NUM], BRAKE_BUTTON)
             axis = joystick_read_button(joysticks[JOYSTICK_NUM], AXIS_BUTTON)
             setting = joystick_read_button(joysticks[JOYSTICK_NUM], SETTING_BUTTON)

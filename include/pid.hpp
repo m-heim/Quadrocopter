@@ -8,7 +8,7 @@ class PID
 public:
     PID() {}
     PID(T kp, T ki, T kd) : kp(kp), ki(ki), kd(kd) {}
-    PID(T kp, T ki, T kd, T integralRange1, T integralRange2) : kp(kp), ki(ki), kd(kd), integralRange1(integralRange1), integralRange2(integralRange2), useIntegralRange(true) {}
+    PID(T kp, T ki, T kd, T integralRange1, T integralRange2) : kp(kp), ki(ki), kd(kd), useIntegralRange(true), integralRange1(integralRange1), integralRange2(integralRange2) {}
     ~PID() {}
     T update(T val, T set, T step)
     {

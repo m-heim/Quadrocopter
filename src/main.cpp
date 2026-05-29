@@ -20,6 +20,8 @@ ArduinoLogger logger(DEBUG, BAUD);
 // an identifying device destination
 uint8_t radioNumber =
     SENDER; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+libmh::ArduinoTimeProvider arduinoProv;
+libmh::TimeProvider<float> &prov = arduinoProv;
 
 void startup();
 #if SENDER == 0
