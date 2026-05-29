@@ -49,9 +49,11 @@ InputPayload inputPayload = InputPayload((uint8_t *)defaultBuf, sizeof(defaultBu
 
 void startup()
 {
+  app.logger.log(FLASH_STRING("S.RF.Init"));
   radio.getRadio().openWritingPipe(address[0]);
   radio.getRadio().openReadingPipe(1, address[1]);
   radio.getRadio().startListening();
+  app.logger.log(FLASH_STRING("S.RF.Init 1"));
 }
 
 void handleSender()

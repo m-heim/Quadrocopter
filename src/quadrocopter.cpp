@@ -3,6 +3,7 @@
 sensors_event_t am, g, temp;
 Adafruit_MPU6050 a;
 int servoPins[SERVOS] = {A0, A1, A2, A3};
+float servoMultiplier[SERVOS] = {1.01, 1.0, 1.03, 1.0};
 Servo servos[SERVOS];
 float pitchVal = 0;
 float rollVal = 0;
@@ -180,10 +181,10 @@ void setSpeeds(int8_t sVals[4], bool motorsApply)
 {
     float speeds[4];
     setValues();
-    pitchVal = filters[0].update(pids[0].update(alphaX / 4.5, sVals[1] / 18, 1));
-    rollVal = filters[1].update(pids[1].update(alphaY / 4.5, sVals[2] / 18, 1));
-    float pp = inRange<float>(pitchVal, -16, 16); // - (yGyro / 4);
-    float rr = inRange<float>(rollVal, -16, 16);  // + (xGyro / 4);
+    pitchVal = filters[0].update(pids[0].update(alphaX / 18, sVals[1] / 127, 1));
+    rollVal = filters[1].update(pids[1].update(alphaY / 18, sVals[2] / 127, 1));
+    float pp = inRange<float>(pitchVal, -8, 8); // - (yGyro / 4);
+    float rr = inRange<float>(rollVal, -8, 8);  // + (xGyro / 4);
     for (int i = 0; i < 4; i++)
     {
         speeds[i] = sVals[0];
@@ -209,7 +210,7 @@ void setSpeeds(int8_t sVals[4], bool motorsApply)
     }
     for (int i = 0; i < 4; i++)
     {
-        int v = 1000 + ((int)(800 * (speeds[i] / 127)));
+        int v = 1000 + ((int)(800 * (speeds[i] * servoMultiplier[i] / 127)));
         v = inRange<int>(v, 1000, 1800);
         if (!motorsApply)
         {
@@ -240,12 +241,12 @@ void initPIDS()
 {
     for (int i = 0; i < PIDS; i++)
     {
-        pids[i] = PID<float>(1, 0.0, 0.1, -1.8, 1.8);
-        filters[i] = Filter<float>(0.18);
+        pids[i] = PID<float>(4.5, 0.0, 1, -1.8, 1.8);
+        filters[i] = Filter<float>(0.45);
     }
     for (int i = 0; i < 2; i++)
     {
-        filters2[i] = Filter<float>(0.045);
+        filters2[i] = Filter<float>(0.18);
     }
 }
 #endif

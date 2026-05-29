@@ -79,10 +79,19 @@ def joystick_setup() -> list[pygame.joystick.Joystick]:
         print(f'Joystick {joystick.get_id()}: {joystick.get_name()}, axis: {joystick.get_numaxes()}')
     return joysticks
 
+def inrange(val, i1, i2):
+    if val <= i1:
+        return i1
+    elif val >= i2:
+        return i2
+    else:
+        return val
 def main():
     if len(sys.argv) != 3:
         print("Usage: python data.py <serial_port> <baud>")
         sys.exit(1)
+        
+    axis_speed = 0
 
     with serial.Serial(sys.argv[1], sys.argv[2], timeout=10) as s:
         joysticks = joystick_setup()
@@ -94,20 +103,22 @@ def main():
             roll = - joystick_read_axis(joysticks[JOYSTICK_NUM], ROLL_AXIS)
             brake = joystick_read_button(joysticks[JOYSTICK_NUM], BRAKE_BUTTON)
             axis = joystick_read_button(joysticks[JOYSTICK_NUM], AXIS_BUTTON)
+            if axis:
+                axis_speed = (0.09 * 0.5) + ((1 - 0.09) * axis_speed)
+            else:
+                axis_speed = ((1 - 0.09) * axis_speed)
             setting = joystick_read_button(joysticks[JOYSTICK_NUM], SETTING_BUTTON)
             if brake == 0:
                 speed = - joystick_read_axis(joysticks[JOYSTICK_NUM], SPEED_AXIS)
                 if axis:
-                    speed = ((speed + 1) * 0.5)
-                #elif speed < 0:
-                #    speed = 0
+                    speed = axis_speed + (speed * 0.45)
             else:
                 speed = 0.0
             steer = round(steer, 3)
             speed = round(speed, 3)
             if DEBUG:
                 print(f'Speed: {speed}, Steer: {steer}, Yaw: {yaw}, Roll: {roll}')
-            data_send(s, speed, steer, yaw, roll)
+            data_send(s, inrange(speed, -1, 1), inrange(steer, -1, 1), inrange(yaw, -1, 1), inrange(roll, -1, 1))
             if setting:
                 setting_send(s)
             #for _ in range(1):
@@ -116,7 +127,7 @@ def main():
                     #print("Got data: " + s.readline().decode('utf-8', errors='ignore'))
                 #except:
                     #break
-            time.sleep(0.2)
+            time.sleep(0.18)
 
 if __name__ == '__main__':
     main()
