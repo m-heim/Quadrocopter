@@ -3,7 +3,7 @@
 sensors_event_t am, g, temp;
 Adafruit_MPU6050 a;
 int servoPins[SERVOS] = {A0, A1, A2, A3};
-float servoMultiplier[SERVOS] = {1.01, 1.0, 1.03, 1.0};
+float servoMultiplier[SERVOS] = {1.03, 1.0, 1.04, 1.0};
 Servo servos[SERVOS];
 float pitchVal = 0;
 float rollVal = 0;
