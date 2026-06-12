@@ -124,17 +124,21 @@ public:
     }
     void log(const char *msg) override
     {
+#ifdef DEBUG
         if (enabled && Serial)
         {
             Serial.println(msg);
         }
+#endif
     }
     void log(const __FlashStringHelper *msg) override
     {
+#ifdef DEBUG
         if (enabled && Serial)
         {
             Serial.println(msg);
         }
+#endif
     }
 
 private:
@@ -272,7 +276,7 @@ public:
         if (beepTimer.isExpired())
         {
             beepTimer.start();
-            buzzer.buzz(1000, 100);
+            buzzer.buzz(390, 78);
         }
     }
     int getVersion() { return MCAPP_VERSION; }
@@ -290,7 +294,7 @@ public:
     VoltageHandler &voltageHandler;
     Message messages[MESSAGES];
     libmh::ExpiryTimer<float> timer = libmh::ExpiryTimer<float>(prov, NO_MSG);
-    libmh::IntervalTimer<float> beepTimer = libmh::IntervalTimer<float>(prov, 1);
+    libmh::IntervalTimer<float> beepTimer = libmh::IntervalTimer<float>(prov, 4.5);
 
 protected:
     int freq = FREQ_BASE;
